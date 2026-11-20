@@ -5,6 +5,8 @@
  *   FILTER   12 dB low pass, its cutoff moved by the mod lane and by the level (TRK)
  *   EQ       lo / mid / hi and a saturating AMP
  *   DELAY    stereo, tempo synced in 16ths, feedback, damping, width (ping-pong)
+ *   REVERB   a metallic FDN at half rate: 4 diffusers, 4 lines (Hadamard), RT60, size, damping, low cut,
+ *            modulation, width; fed from the mix (SEND) and from the delay (DLY>RV)
  *   OUT      DIRT (distortion), NORM (a maximiser), GAIN
  */
 
@@ -15,6 +17,11 @@
 static int16_t dl_buf[2][DL_LEN] POOL;
 static int16_t rp_buf[2][RP_LEN] POOL;
 static int16_t cb_buf[2][CB_LEN] POOL;
+#define RV_LEN 4096u                            /* a reverb line at half rate: up to 186 ms */
+#define AP_LEN 512u
+static int16_t rv_buf[4][RV_LEN] POOL;
+static int16_t ap_buf[4][AP_LEN] POOL;
+static int32_t dl_out[2u * 32u];                /* what the delay added this block (the reverb's DLY>RV) */
 
 static volatile uint8_t fx_x = 64, fx_y = 64;  /* the pad as it is now: the knobs or the recorded motion */
 
@@ -33,9 +40,14 @@ static struct {
     int32_t lo1[2], lo2[2];
     /* delay */
     uint32_t dw; int32_t dprev[2], dcur[2], ddamp[2], dodd[2];
+    /* reverb */
+    uint32_t rw, apw, rlfo;
+    uint8_t rp[4];                              /* TIME SIZE DAMP MOD the coefficients below are for */
+    uint32_t rlen[4]; int32_t rg[4], rdamp, rmod;
+    int32_t rlp[4], rhp, rprev[2], rcur[2], rquiet;
     /* out */
     int32_t norm_env, norm_g;
-} X = {.type = 255, .norm_g = 4096};
+} X = {.type = 255, .norm_g = 4096, .rp = {255, 255, 255, 255}};
 
 static int32_t mix15(int32_t dry, int32_t wet, int32_t m) { return dry + MUL15(wet - dry, m); }
 static int32_t fold15(int32_t x)                /* a triangle fold: whatever goes past full scale comes back */
@@ -210,6 +222,7 @@ static void eq(int32_t *b, uint32_t n)
 
 static void delay(int32_t *b, uint32_t n)
 {
+    for (uint32_t k = 0; k < 2u * n; k++) dl_out[k] = 0;
     uint32_t i, c, f16 = frames16 / 2u;
     uint32_t dt[2] = {f16 * (P.fx[FX_DL] ? P.fx[FX_DL] : 1u), f16 * (P.fx[FX_DR] ? P.fx[FX_DR] : 1u)};
     int32_t send = (int32_t)P.fx[FX_DSEND] * 258, fb = (int32_t)P.fx[FX_DFB] * 240, w = (int32_t)P.fx[FX_DWIDTH] * 258;
@@ -235,10 +248,119 @@ static void delay(int32_t *b, uint32_t n)
             X.dw++;
         } else
             for (c = 0; c < 2u; c++) X.dodd[c] = b[2u * i + c];
-        for (c = 0; c < 2u; c++)                /* (half way between the last two: a linear step) */
-            b[2u * i + c] += (i & 1u) ? X.dcur[c] : (X.dprev[c] + X.dcur[c]) >> 1;
+        for (c = 0; c < 2u; c++) {              /* (half way between the last two: a linear step) */
+            int32_t o = (i & 1u) ? X.dcur[c] : (X.dprev[c] + X.dcur[c]) >> 1;
+            b[2u * i + c] += o;
+            dl_out[2u * i + c] = o;
+        }
     }
     if (X.dcur[0] > -4 && X.dcur[0] < 4 && X.dcur[1] > -4 && X.dcur[1] < 4 && !send) X.dcur[0] = X.dcur[1] = 0;
+}
+
+
+/* ---- the reverb */
+static const uint16_t RV_L[4] = {1777, 2111, 2593, 3001};   /* the lines at full SIZE (half-rate frames) */
+static const uint16_t AP_L[4] = {105, 79, 281, 205};        /* the diffusers */
+static const int16_t AP_C[4] = {20480, 20480, 16384, 16384}; /* their coefficients: 0.625, 0.5 */
+
+static int32_t q31_pow(uint32_t d, uint32_t e)  /* d^e, both Q31 (d < 1) */
+{
+    uint64_t r = 0x80000000u, b = d;
+    while (e) {
+        if (e & 1u) r = (r * b) >> 31;
+        b = (b * b) >> 31;
+        e >>= 1;
+    }
+    return (int32_t)(r >> 16);                  /* Q15 */
+}
+
+static void reverb_coeffs(void)                 /* when TIME, SIZE, DAMP or MOD moved: a few multiplies */
+{
+    uint32_t k, t = P.fx[FX_RTIME], sz = P.fx[FX_RSIZE], dm = P.fx[FX_RDAMP], md = P.fx[FX_RMOD];
+    if (t == X.rp[0] && sz == X.rp[1] && dm == X.rp[2] && md == X.rp[3]) return;
+    for (k = 0; k < 4u; k++) {
+        X.rlen[k] = RV_L[k] * (40u + sz * 87u / 127u) / 127u;   /* 31 % .. 100 % */
+        X.rg[k] = q31_pow(RV_DECAY[t & 127u], X.rlen[k]);
+    }
+    X.rdamp = 32767 - (int32_t)dm * 232;        /* the loop's low pass: open .. ~1 kHz */
+    X.rmod = (int32_t)md * 128;                 /* up to 16 frames of wobble, Q8 */
+    X.rp[0] = (uint8_t)t; X.rp[1] = (uint8_t)sz; X.rp[2] = (uint8_t)dm; X.rp[3] = (uint8_t)md;
+}
+
+/* toward zero, not toward minus infinity: inside a feedback loop, floor() keeps a -1 going round forever */
+static inline int32_t mulz15(int32_t a, int32_t b)   /* |a| < 65536, 0 <= b < 32768: fits 32 bits */
+{
+    int32_t p = a * b;
+    return p >= 0 ? p >> 15 : -((-p) >> 15);
+}
+static inline int32_t halfz(int32_t x) { return (x + (x < 0)) >> 1; }
+
+static int32_t rv_read(uint32_t k, uint32_t d8)  /* line k, d8 frames back (Q8): linear between two */
+{
+    uint32_t d = d8 >> 8, fr = d8 & 255u;
+    int32_t a = rv_buf[k][(X.rw - d) & (RV_LEN - 1u)], b = rv_buf[k][(X.rw - d - 1u) & (RV_LEN - 1u)];
+    return a + (((b - a) * (int32_t)fr) >> 8);
+}
+
+static void rv_step(int32_t in, int32_t *ol, int32_t *or_)   /* one half-rate frame */
+{
+    uint32_t k;
+    int32_t r[4], h[4], a, bq, c, d, wob, low = P.fx[FX_RLOW];
+    if (low) {                                  /* LOW: a one-pole high pass on the way in, 20 Hz .. ~1 kHz */
+        X.rhp += MUL15(in - X.rhp, low * low * 9337 / 16129);
+        in -= X.rhp;
+    }
+    for (k = 0; k < 4u; k++) {                  /* the diffusers: allpasses in a row */
+        int32_t dl = ap_buf[k][(X.apw - AP_L[k]) & (AP_LEN - 1u)], v = clip15(in - mulz15(dl, AP_C[k]));
+        ap_buf[k][X.apw & (AP_LEN - 1u)] = (int16_t)v;
+        in = dl + mulz15(v, AP_C[k]);
+    }
+    X.apw++;
+    X.rlfo += 0x00030000u;                      /* ~0.7 Hz at half rate */
+    wob = MUL15(sin15(X.rlfo), X.rmod);         /* Q8 frames */
+    r[0] = rv_read(0, (uint32_t)((int32_t)(X.rlen[0] << 8) + wob));   /* two lines wobble (MOD), two don't */
+    r[1] = rv_buf[1][(X.rw - X.rlen[1]) & (RV_LEN - 1u)];
+    r[2] = rv_read(2, (uint32_t)((int32_t)(X.rlen[2] << 8) - wob));
+    r[3] = rv_buf[3][(X.rw - X.rlen[3]) & (RV_LEN - 1u)];
+    for (k = 0; k < 4u; k++) {
+        X.rlp[k] += mulz15(clampi(r[k] - X.rlp[k], -65535, 65535), X.rdamp);
+        h[k] = mulz15(X.rlp[k], X.rg[k]);
+    }
+    a = h[0] + h[1]; bq = h[0] - h[1]; c = h[2] + h[3]; d = h[2] - h[3];   /* Hadamard, /2: it keeps the energy */
+    in = halfz(in);
+    rv_buf[0][X.rw & (RV_LEN - 1u)] = (int16_t)clip15(halfz(a + c) + in);
+    rv_buf[1][X.rw & (RV_LEN - 1u)] = (int16_t)clip15(halfz(bq + d) - in);
+    rv_buf[2][X.rw & (RV_LEN - 1u)] = (int16_t)clip15(halfz(a - c) + in);
+    rv_buf[3][X.rw & (RV_LEN - 1u)] = (int16_t)clip15(halfz(bq - d) - in);
+    X.rw++;
+    *ol = halfz(r[0] + r[2]);
+    *or_ = halfz(r[1] + r[3]);
+}
+
+static void reverb(int32_t *b, const int32_t *dry, uint32_t n)
+{
+    uint32_t i, c;
+    int32_t send = (int32_t)P.fx[FX_RSEND] * 258, dsend = (int32_t)P.fx[FX_RDLY] * 258;
+    int32_t width = (int32_t)P.fx[FX_RWIDTH] * 258, peak = 0;
+    if (!send && !dsend && X.rquiet > 4000) return;   /* (the tail has played out: nothing to do) */
+    reverb_coeffs();
+    for (i = 1; i < n; i += 2u) {               /* one half-rate step per pair of frames */
+        int32_t l, r, m, sd, in, o;
+        in = ((dry[i - 1u] + dry[i]) >> 1) * (send >> 7)
+           + ((dl_out[2u * i - 2u] + dl_out[2u * i - 1u] + dl_out[2u * i] + dl_out[2u * i + 1u]) >> 2) * (dsend >> 7);
+        rv_step(in >> 8, &l, &r);               /* (send, dsend: Q15 >> 7 = Q8) */
+        m = (l + r) >> 1; sd = (((l - r) >> 1) * (width >> 7)) >> 8;   /* WIDTH: 0 mono .. 127 full */
+        X.rprev[0] = X.rcur[0]; X.rprev[1] = X.rcur[1];
+        X.rcur[0] = m + sd; X.rcur[1] = m - sd;
+        for (c = 0; c < 2u; c++) {
+            int32_t mid = (X.rprev[c] + X.rcur[c]) >> 1;   /* (half way between the last two: a linear step) */
+            b[2u * (i - 1u) + c] += mid;
+            b[2u * i + c] += X.rcur[c];
+            o = X.rcur[c] < 0 ? -X.rcur[c] : X.rcur[c];
+            if (o > peak) peak = o;
+        }
+    }
+    X.rquiet = (peak > 3 || send || dsend) ? 0 : X.rquiet + (int32_t)n;   /* frames of silence in a row */
 }
 
 static void out_stage(int32_t *b, uint32_t n)
@@ -266,9 +388,13 @@ static void out_stage(int32_t *b, uint32_t n)
 
 static void fx_render(int32_t *b, uint32_t n)
 {
+    int32_t dry[32];                            /* (n is BLK, 32) the mix before the delay, mono: the reverb's SEND */
+    uint32_t i;
     xfx(b, n);
     master_filter(b, n);
     eq(b, n);
+    for (i = 0; i < n && i < 32u; i++) dry[i] = (b[2u * i] + b[2u * i + 1u]) >> 1;
     delay(b, n);
+    reverb(b, dry, n);
     out_stage(b, n);
 }

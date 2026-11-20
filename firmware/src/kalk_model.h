@@ -2,6 +2,7 @@
 /* KALK: the project (what is saved) and the names of things. One project = one blob (4 KiB). */
 #pragma once
 #include <stdint.h>
+#include <stddef.h>
 
 #define NSTEP 16u
 #define NPAT 4u                                 /* A B C D */
@@ -10,7 +11,8 @@
 #define NLANE 6u
 #define NVOICE 5u                               /* kick snare hat tie pod (the hat plays two voices: closed, open) */
 #define NVP 16u                                 /* parameters per voice */
-#define NFX 24u
+#define NFX 32u                                /* (0.2 had 24: the reverb came after) */
+#define NFX02 24u
 #define NXY 64u                                 /* XFX motion: 64 points (4 bars of 16ths) */
 #define NCHAIN 8u
 
@@ -38,6 +40,8 @@ enum {
     FX_FCUT, FX_FRES, FX_FMOD, FX_FTRK,         /* master filter: cutoff, resonance, mod lane depth, envelope follow */
     FX_EQLO, FX_EQMID, FX_EQHI, FX_EQAMP,       /* EQ: lo mid hi, saturation */
     FX_GAIN, FX_PITCH, FX_DIRT, FX_NORM,        /* out: volume, pitch (+-12), dirt, norm (the maximiser) */
+    FX_RTIME, FX_RSIZE, FX_RDAMP, FX_RSEND,     /* reverb: RT60, room size, high damping, send from the mix */
+    FX_RLOW, FX_RMOD, FX_RWIDTH, FX_RDLY,       /* reverb: low cut, modulation, width (0: mono), send from the delay */
 };
 enum { XF_THRU, XF_CRUSH, XF_BPF, XF_RING, XF_COMB, XF_REPEAT, XF_LPF, XF_HPF, XF_FOLD, XF_GATE, XF_PAN, XF_FLANGE, NXF };
 
@@ -62,3 +66,22 @@ typedef struct {
 } project_t;
 #define PROJ_MAGIC 0x4B4C4B31u                  /* "1KLK" */
 _Static_assert(sizeof(project_t) < 4000u, "a project is one blob");
+
+/* a project as 0.2 saved it (NFX02 effects): loaded, then given the new parameters' defaults */
+typedef struct {
+    uint8_t head[offsetof(project_t, fx)];      /* everything before fx: the same */
+    uint8_t fx[NFX02];
+    uint8_t xy[NXY][2];
+    uint8_t pad[3];
+    uint32_t magic;
+} project02_t;
+
+/* a 0.2 project into t, which already holds the defaults: everything 0.2 had is copied, the rest stays */
+static void proj_upgrade02(project_t *t, const project02_t *o)
+{
+    uint32_t i;
+    for (i = 0; i < sizeof o->head; i++) ((uint8_t *)t)[i] = o->head[i];
+    for (i = 0; i < NFX02; i++) t->fx[i] = o->fx[i];
+    for (i = 0; i < NXY; i++) { t->xy[i][0] = o->xy[i][0]; t->xy[i][1] = o->xy[i][1]; }
+    t->magic = o->magic;
+}

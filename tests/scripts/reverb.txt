@@ -1,0 +1,16 @@
+# KALK reverb demo: A dry for 4 bars, then FX > REVERB with SEND up, then a longer, brighter TIME, then stop: the tail
+100 btn 12
+7800 btn 2
+7810 enc 0 1
+7820 enc 0 1
+7830 enc 0 1
+7840 enc 0 1
+7850 enc 0 1
+7860 enc 0 1
+8000 enc 5 20
+8100 shot
+15600 enc 2 8
+15700 enc 4 -10
+15800 shot
+19500 btn 12
+24500 end

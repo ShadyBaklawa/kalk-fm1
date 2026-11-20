@@ -78,6 +78,20 @@ def main():
     out.append(f"#define RECIP60 {round(2 ** 48 / inc[60])}u")
     out.append("")
 
+    # the reverb (at half rate): RT60 0.12 s .. 21.6 s; the gain per frame for -60 dB in that time, Q31
+    rfs = FS / 2
+    rd, rms = [], []
+    for i in range(128):
+        rt = 0.12 * 180 ** (i / 127)
+        rd.append(min(2 ** 31 - 1, round(2 ** 31 * 10 ** (-3 / (rt * rfs)))))
+        rms.append(round(rt * 1000))
+    out.append("/* the reverb: TIME 0..127 -> RT60 0.12 .. 21.6 s; the gain per half-rate frame for -60 dB in it, Q31 */")
+    out.append(arr("RV_DECAY", "uint32_t", rd, 6))
+    out.append("")
+    out.append("/* RV_DECAY's times in ms (the screen) */")
+    out.append(arr("RV_MS", "uint16_t", rms, 16))
+    out.append("")
+
     # the screen's lime slice: the angle of a pixel in a quadrant, clockwise from the vertical, 0..1023 (= 90 degrees)
     ang = []
     for ay in range(120):

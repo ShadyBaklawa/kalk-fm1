@@ -100,6 +100,11 @@ the synthesised candidates to `build/vogel/` to audition.
 | FILTER | CUT | RES | MOD (the mod lane) | TRK (follows the level) |
 | EQ | LO | MID | HI | AMP |
 | OUT | GAIN | PITCH (+-12, all voices) | DIRT | NORM (the maximiser) |
+| REVERB | TIME (RT60 0.12-21.6 s) | SIZE | DAMP (the highs die first) | SEND (from the mix) |
+| REVERB 2 | LOW (cuts the lows going in: keeps the kick dry) | MOD (wobble, for a metallic shimmer) | WIDTH (0: mono) | DLY>RV (the echoes into the reverb) |
+
+The reverb is a feedback network of four lines with four diffusers before it, at half rate. With both its sends at 0
+it switches itself off once its tail has died away. Projects saved by 0.2 load with the reverb off.
 
 XFX: THRU, CRUSH (bits, rate), BPF, RING (frequency, wobble), COMB (time, feedback), REPEAT (length; Y over the middle
 repeats), LPF, HPF, FOLD (drive, bias), GATE and PAN (rate, depth, tempo synced), FLANGE (rate, depth).
