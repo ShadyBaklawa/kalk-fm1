@@ -2,6 +2,7 @@
 /* KALK's effects on their own, starting with the reverb: an impulse and a burst of noise through the effects chain.
  * Checks the reverb rings, decays at about its TIME, never runs away (every TIME, SIZE, DAMP), stays silent at
  * send 0, and that a 0.2 project's effects (no reverb fields) leave it off. Writes build/host/reverb.wav.
+ * The reson delay: the 0.2 delay bit for bit at rest, resonance at its FREQ, no runaway, the LFO, INVERT.
  *   cc -O2 -Ifirmware/src -o build/host/fx_test tests/fx_test.c -lm && build/host/fx_test */
 #include <stdint.h>
 #include <stdio.h>
@@ -34,7 +35,7 @@ static void fx_reset(void)
 static void fx_neutral(void)                    /* everything off but the reverb: XFX thru, no delay, flat EQ, no norm */
 {
     static const uint8_t F[NFX] = {XF_THRU, 64, 32, 0,  3, 4, 0, 0,  0, 0, 127, 0,  127, 0, 64, 0,  64, 64, 64, 0,
-                                   64, 12, 0, 0,  70, 90, 60, 0,  0, 0, 127, 0};
+                                   64, 12, 0, 0,  70, 90, 60, 0,  0, 0, 127, 0,  114, 0, 0, 0,  4, 0, 0, 0};
     memcpy(P.fx, F, sizeof F);
 }
 
@@ -129,6 +130,102 @@ int main(void)
             for (j = 0; j < B; j++) if (i > 60u && b[2 * j] != b[2 * j + 1]) diff++;
         }
         check(!diff, "WIDTH 0: the reverb is mono");
+    }
+
+
+    /* ---- the reson delay */
+    {   /* at rest it is the 0.2 delay, bit for bit: a fingerprint of 6 s through the chain (short and long times) */
+        static const uint8_t F02[24] = {XF_THRU, 64, 32, 1, 3, 4, 90, 100, 50, 90, 127, 0, 127, 0, 64, 0, 64, 64, 64, 0, 64, 12, 0, 40};
+        static const uint32_t WANT[2] = {0xc96f812eu, 0x0d7b1e9cu};   /* (from 0.2's kalk_fx.c) */
+        uint32_t v, k, h;
+        int same = 1;
+        static int32_t b[2 * B];
+        for (v = 0; v < 2u; v++) {
+            fx_reset();
+            memset(P.fx, 0, sizeof P.fx); memcpy(P.fx, F02, 24); P.fx[FX_DFREQ] = 114; P.fx[FX_DLFO] = 4;
+            if (v) { P.fx[FX_DL] = 12; P.fx[FX_DR] = 16; }
+            k_rng = 0x2545F491u;
+            h = 2166136261u;
+            for (k = 0; k < 44100u * 6u / 32u; k++) {
+                for (i = 0; i < 2 * B; i++) b[i] = (k % 600u < 20u) ? noise15() : 0;
+                fx_render(b, B);
+                for (i = 0; i < 2 * B; i++) { h ^= (uint32_t)b[i]; h *= 16777619u; }
+            }
+            if (h != WANT[v]) { same = 0; printf("     fingerprint %u: %08x, want %08x\n", v, h, WANT[v]); }
+        }
+        check(same, "RESON / TAPE LFO at rest: the 0.2 delay, bit for bit (short and long times)");
+    }
+    {   /* resonance: BP at ~1 kHz, high RES and feedback, an impulse: the echoes ring near 1 kHz */
+        static int32_t b[2 * B];
+        static int16_t y[44100];
+        uint32_t k, n = 0, f, zc = 0, best = 0;
+        fx_reset(); fx_neutral();
+        for (f = 0; f < 114u && SVF_HZ[f] < 1000u; f++) ;
+        P.fx[FX_DSEND] = 127; P.fx[FX_DFB] = 100; P.fx[FX_DFREQ] = (uint8_t)f; P.fx[FX_DRES] = 120; P.fx[FX_DFTYPE] = 1;
+        for (k = 0; k < 44100u / 32u; k++) {
+            for (i = 0; i < 2 * B; i++) b[i] = (k == 0u && i < 2u) ? 30000 : 0;
+            fx_render(b, B);
+            for (i = 0; i < B && n < 44100u; i++) y[n++] = (int16_t)b[2 * i];
+        }
+        {                                       /* the strongest of 1/12-octave steps, 200 Hz .. 5 kHz (Goertzel) */
+            double fr, bestp = 0;
+            for (fr = 200; fr < 5000; fr *= 1.0595) {
+                double w = 2 * cos(2 * M_PI * fr / 44100), s0, s1 = 0, s2 = 0, pw;
+                for (k = 4410u; k < 44100u; k++) { s0 = y[k] + w * s1 - s2; s2 = s1; s1 = s0; }
+                pw = s1 * s1 + s2 * s2 - w * s1 * s2;
+                if (pw > bestp) { bestp = pw; best = (uint32_t)fr; }
+            }
+        }
+        (void)zc;
+        printf("     BP at %u Hz, RES 120: rings at ~%u Hz\n", SVF_HZ[f], best);
+        check(best > SVF_HZ[f] * 7u / 10u && best < SVF_HZ[f] * 13u / 10u, "RESON: the echoes ring at its FREQ");
+    }
+    {   /* no runaway: full feedback, full resonance, every filter, full LFO, noise in */
+        int bad = 0;
+        uint32_t ft;
+        for (ft = 0; ft < 3u; ft++) {
+            fx_reset(); fx_neutral();
+            P.fx[FX_DSEND] = 127; P.fx[FX_DFB] = 127; P.fx[FX_DRES] = 127; P.fx[FX_DFTYPE] = (uint8_t)ft;
+            P.fx[FX_DFREQ] = 60; P.fx[FX_DFM] = 127; P.fx[FX_DDMOD] = 127; P.fx[FX_DLFO] = 0; P.fx[FX_DWIDTH] = 127;
+            run(4.0, 1, env, &pk, NULL);
+            if (!(pk < 1.0)) { bad++; printf("     filter %u: peak %.2f\n", ft, pk); }
+        }
+        check(!bad, "RESON: no runaway at full feedback and resonance (LP, BP, HP; full FM and DMOD)");
+    }
+    {   /* the tape LFO moves the time: a chorus at time 0 with DMOD differs from without; INVERT flips the 2nd echo */
+        static int32_t b[2 * B];
+        double e0[3000], e1[3000], p0, p1;
+        int32_t first[2] = {0, 0}, second[2] = {0, 0};
+        uint32_t v, k, f;
+        fx_reset(); fx_neutral(); P.fx[FX_DSEND] = 127; P.fx[FX_DFB] = 60; P.fx[FX_DL] = P.fx[FX_DR] = 0;
+        k_rng = 1234u;
+        run(0.5, 1, e0, &p0, NULL);
+        fx_reset(); fx_neutral(); P.fx[FX_DSEND] = 127; P.fx[FX_DFB] = 60; P.fx[FX_DL] = P.fx[FX_DR] = 0;
+        P.fx[FX_DDMOD] = 100; P.fx[FX_DLFO] = 0;
+        k_rng = 1234u;
+        run(0.5, 1, e1, &p1, NULL);
+        {
+            double dsum = 0;
+            for (k = 1; k < 8u; k++) dsum += fabs(db(e0[k]) - db(e1[k]));   /* during the 50 ms burst */
+            printf("     chorus with and without DMOD: %.2f dB apart over the burst\n", dsum / 7);
+            check(dsum / 7 > 0.05, "TAPE LFO: DMOD moves the time (a chorus at time 0)");
+        }
+        for (v = 0; v < 2u; v++) {              /* the 2nd echo against the 1st, with and without INVERT */
+            uint32_t at1 = 2u * 2756u * 3u, at2 = 2u * at1, nn = 0;   /* (3/16 at 124 BPM, in frames) */
+            fx_reset(); fx_neutral(); P.fx[FX_DSEND] = 127; P.fx[FX_DFB] = 100; P.fx[FX_DL] = P.fx[FX_DR] = 3;
+            P.fx[FX_DINV] = (uint8_t)v;
+            for (k = 0; k < 44100u * 2u / 32u; k++) {
+                for (i = 0; i < 2 * B; i++) b[i] = (k == 0u && i < 2u) ? 30000 : 0;
+                fx_render(b, B);
+                for (f = 0; f < B; f++, nn++) {
+                    if (nn + 40u > at1 / 2u * 2u && nn < at1 + 40u && abs(b[2 * f]) > abs(first[v])) first[v] = b[2 * f];
+                    if (nn + 40u > at2 && nn < at2 + 40u && abs(b[2 * f]) > abs(second[v])) second[v] = b[2 * f];
+                }
+            }
+        }
+        printf("     echoes: plain %d, %d; inverted %d, %d\n", first[0], second[0], first[1], second[1]);
+        check((first[0] > 0) == (second[0] > 0) && (first[1] > 0) != (second[1] > 0) && first[1] && second[1],
+              "INVERT: the feedback flips each echo's sign");
     }
 
     /* a 0.2 project: everything it had is kept; the new effects keep their defaults */

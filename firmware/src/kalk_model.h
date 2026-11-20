@@ -11,7 +11,7 @@
 #define NLANE 6u
 #define NVOICE 5u                               /* kick snare hat tie pod (the hat plays two voices: closed, open) */
 #define NVP 16u                                 /* parameters per voice */
-#define NFX 32u                                /* (0.2 had 24: the reverb came after) */
+#define NFX 40u                                /* (0.2 had 24: the reverb and the reson delay came after) */
 #define NFX02 24u
 #define NXY 64u                                 /* XFX motion: 64 points (4 bars of 16ths) */
 #define NCHAIN 8u
@@ -42,6 +42,8 @@ enum {
     FX_GAIN, FX_PITCH, FX_DIRT, FX_NORM,        /* out: volume, pitch (+-12), dirt, norm (the maximiser) */
     FX_RTIME, FX_RSIZE, FX_RDAMP, FX_RSEND,     /* reverb: RT60, room size, high damping, send from the mix */
     FX_RLOW, FX_RMOD, FX_RWIDTH, FX_RDLY,       /* reverb: low cut, modulation, width (0: mono), send from the delay */
+    FX_DFREQ, FX_DRES, FX_DFTYPE, FX_DLO,       /* reson delay: the filter in the loop (LP BP HP), low cut going in */
+    FX_DLFO, FX_DDMOD, FX_DFM, FX_DINV,         /* its LFO (synced), on the time (tape), on the cutoff; feedback inverted */
 };
 enum { XF_THRU, XF_CRUSH, XF_BPF, XF_RING, XF_COMB, XF_REPEAT, XF_LPF, XF_HPF, XF_FOLD, XF_GATE, XF_PAN, XF_FLANGE, NXF };
 

@@ -1,0 +1,27 @@
+# KALK reson delay demo: A dry, then the delay (3/16, 4/16), then RESON (band pass, resonant, lower), then the
+# TAPE LFO on cutoff and time, then both times to 0: the chorus / flanger; stop: the tail
+100 btn 12
+3900 btn 2
+3910 enc 0 1
+3950 enc 5 20
+3960 enc 4 14
+4000 shot
+7800 enc 0 1
+7810 enc 0 1
+7850 enc 2 -14
+7860 enc 3 34
+7870 enc 4 1
+7900 shot
+11700 enc 0 1
+11750 enc 2 -1
+11760 enc 4 18
+11770 enc 3 8
+11800 shot
+15600 enc 0 -1
+15610 enc 0 -1
+15620 enc 0 -1
+15650 enc 2 -6
+15660 enc 3 -6
+15700 shot
+19500 btn 12
+22500 end

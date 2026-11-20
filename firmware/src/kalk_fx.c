@@ -4,7 +4,9 @@
  *   XFX      one of 12 effects on an XY pad (K2 = X, K3 = Y); the pad's motion recorded over 4 bars (64 points)
  *   FILTER   12 dB low pass, its cutoff moved by the mod lane and by the level (TRK)
  *   EQ       lo / mid / hi and a saturating AMP
- *   DELAY    stereo, tempo synced in 16ths, feedback, damping, width (ping-pong)
+ *   DELAY    stereo, tempo synced in 16ths (0: a chorus), feedback, damping, width (cross feedback); RESON: a
+ *            resonant LP / BP / HP in the loop with soft limiting, a low cut going in, feedback inverted; TAPE LFO:
+ *            synced, stereo (90 degrees apart), on the time (DMOD: wobble) and on the cutoff (FM)
  *   REVERB   a metallic FDN at half rate: 4 diffusers, 4 lines (Hadamard), RT60, size, damping, low cut,
  *            modulation, width; fed from the mix (SEND) and from the delay (DLY>RV)
  *   OUT      DIRT (distortion), NORM (a maximiser), GAIN
@@ -40,6 +42,7 @@ static struct {
     int32_t lo1[2], lo2[2];
     /* delay */
     uint32_t dw; int32_t dprev[2], dcur[2], ddamp[2], dodd[2];
+    svf_t df[2]; int32_t dlo[2];
     /* reverb */
     uint32_t rw, apw, rlfo;
     uint8_t rp[4];                              /* TIME SIZE DAMP MOD the coefficients below are for */
@@ -220,28 +223,58 @@ static void eq(int32_t *b, uint32_t n)
         }
 }
 
+/* the delay's LFO: synced to the bar, one cycle in 1/16 .. 4 bars; L and R 90 degrees apart */
+static const uint8_t DLFO_16[7] = {1, 2, 4, 8, 16, 32, 64};
+static int32_t delay_lfo(uint32_t c)
+{
+    uint32_t per = DLFO_16[P.fx[FX_DLFO] < 7u ? P.fx[FX_DLFO] : 4u];
+    uint32_t ph = pos16_q8() * (0x1000000u / per) + (c ? 0x40000000u : 0u);
+    return sin15(ph);
+}
+
+#define CHORUS_D 180u                           /* time 0: ~8 ms at half rate (a chorus, a flanger with DMOD) */
 static void delay(int32_t *b, uint32_t n)
 {
-    for (uint32_t k = 0; k < 2u * n; k++) dl_out[k] = 0;
     uint32_t i, c, f16 = frames16 / 2u;
-    uint32_t dt[2] = {f16 * (P.fx[FX_DL] ? P.fx[FX_DL] : 1u), f16 * (P.fx[FX_DR] ? P.fx[FX_DR] : 1u)};
+    uint32_t dt[2] = {P.fx[FX_DL] ? f16 * P.fx[FX_DL] : CHORUS_D, P.fx[FX_DR] ? f16 * P.fx[FX_DR] : CHORUS_D};
     int32_t send = (int32_t)P.fx[FX_DSEND] * 258, fb = (int32_t)P.fx[FX_DFB] * 240, w = (int32_t)P.fx[FX_DWIDTH] * 258;
     int32_t damp = 32767 - (int32_t)P.fx[FX_DDAMP] * 240;
+    int32_t dmod = (int32_t)P.fx[FX_DDMOD] * P.fx[FX_DDMOD] * 4;   /* the wobble: up to ~250 frames, Q8 */
+    int32_t lo = P.fx[FX_DLO] ? (int32_t)P.fx[FX_DLO] * P.fx[FX_DLO] * 9337 / 16129 : 0;
+    uint32_t ftype = P.fx[FX_DFTYPE] < 3u ? P.fx[FX_DFTYPE] : 0u, d8[2];
+    int filt = P.fx[FX_DFREQ] < 114u || P.fx[FX_DRES] || ftype || P.fx[FX_DFM];   /* (all at rest: the 0.2 delay) */
+    for (uint32_t k = 0; k < 2u * n; k++) dl_out[k] = 0;
+    if (P.fx[FX_DINV]) fb = -fb;
     if (!send) {
         if (!X.dcur[0] && !X.dcur[1]) return;   /* (the tail plays out, then nothing to do) */
     }
-    for (c = 0; c < 2u; c++) if (dt[c] >= DL_LEN) dt[c] = DL_LEN - 1u;
+    for (c = 0; c < 2u; c++) {
+        int32_t l = (dmod || filt) ? delay_lfo(c) : 0, dd;
+        if (dt[c] >= DL_LEN - (dmod ? 300u : 1u)) dt[c] = DL_LEN - (dmod ? 300u : 1u);   /* (room for the wobble) */
+        dd = (int32_t)(dt[c] << 8) + MUL15(l, dmod);   /* the time, wobbling (Q8 frames) */
+        d8[c] = (uint32_t)(dd < 512 ? 512 : dd);
+        if (filt) {                             /* the cutoff, moved by FM; at half rate: 13 table steps an octave up */
+            int32_t cut = (int32_t)P.fx[FX_DFREQ] + 13 + MUL15(l, (int32_t)P.fx[FX_DFM] * 64 / 127);
+            svf_set(&X.df[c], SVF_G[clampi(cut, 0, 127)], P.fx[FX_DRES]);
+        }
+    }
     for (i = 0; i < n; i++) {
         if (i & 1u) {                           /* every other frame: one step of the half-rate line */
             int32_t r[2];
             for (c = 0; c < 2u; c++) {
-                r[c] = dl_buf[c][(X.dw - dt[c]) & (DL_LEN - 1u)];
+                uint32_t dw = d8[c] >> 8, fr = d8[c] & 255u;
+                int32_t a = dl_buf[c][(X.dw - dw) & (DL_LEN - 1u)];
+                if (fr) a += ((dl_buf[c][(X.dw - dw - 1u) & (DL_LEN - 1u)] - a) * (int32_t)fr) >> 8;
+                if (filt) a = svf_run(&X.df[c], a, ftype);
+                r[c] = a;
                 X.ddamp[c] += MUL15(r[c] - X.ddamp[c], damp);
             }
             for (c = 0; c < 2u; c++) {
                 int32_t in = MUL15((X.dodd[c] + b[2u * i + c]) >> 1, send);
                 int32_t back = mix15(X.ddamp[c], X.ddamp[c ^ 1u], w);   /* width: the other side's echo */
-                dl_buf[c][X.dw & (DL_LEN - 1u)] = (int16_t)clip15(in + MUL15(back, fb));
+                if (lo) { X.dlo[c] += MUL15(in - X.dlo[c], lo); in -= X.dlo[c]; }   /* LO CUT going in */
+                dl_buf[c][X.dw & (DL_LEN - 1u)] = (int16_t)(filt ? soft15(in + MUL15(back, fb))   /* (limiting: resonance) */
+                                                                 : clip15(in + MUL15(back, fb)));
                 X.dprev[c] = X.dcur[c];
                 X.dcur[c] = r[c];
             }
@@ -256,7 +289,6 @@ static void delay(int32_t *b, uint32_t n)
     }
     if (X.dcur[0] > -4 && X.dcur[0] < 4 && X.dcur[1] > -4 && X.dcur[1] < 4 && !send) X.dcur[0] = X.dcur[1] = 0;
 }
-
 
 /* ---- the reverb */
 static const uint16_t RV_L[4] = {1777, 2111, 2593, 3001};   /* the lines at full SIZE (half-rate frames) */

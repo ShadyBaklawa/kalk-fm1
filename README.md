@@ -95,13 +95,18 @@ the synthesised candidates to `build/vogel/` to audition.
 | Page | K1 | K2 | K3 | K4 |
 | --- | --- | --- | --- | --- |
 | XFX | the effect | X | Y | MOTION: OFF, PLAY, SMOOTH |
-| DELAY | L (16ths) | R (16ths) | FDBK | SEND |
-| DELAY 2 | DAMP | WIDTH (ping-pong) | XMIX (XFX dry / wet) | MOD>FX: the mod lane GATEs XFX, sets its MIX or its X |
+| DELAY | L (16ths; 0: CHORUS, ~8 ms) | R (16ths; 0: CHORUS) | FDBK | SEND |
+| DELAY 2 | DAMP | WIDTH (cross feedback: ping-pong) | XMIX (XFX dry / wet) | MOD>FX: the mod lane GATEs XFX, sets its MIX or its X |
+| RESON | FREQ (the filter in the echoes' loop) | RES | FILT (LP, BP, HP) | LO CUT (going in) |
+| TAPE LFO | LFO (1/16 .. 4 bars, synced; L and R a quarter apart) | DMOD (on the time: wobble, or a flanger at 0) | FM (on the cutoff) | INVERT (the feedback) |
 | FILTER | CUT | RES | MOD (the mod lane) | TRK (follows the level) |
 | EQ | LO | MID | HI | AMP |
 | OUT | GAIN | PITCH (+-12, all voices) | DIRT | NORM (the maximiser) |
 | REVERB | TIME (RT60 0.12-21.6 s) | SIZE | DAMP (the highs die first) | SEND (from the mix) |
 | REVERB 2 | LOW (cuts the lows going in: keeps the kick dry) | MOD (wobble, for a metallic shimmer) | WIDTH (0: mono) | DLY>RV (the echoes into the reverb) |
+
+The delay is a tape-style reson delay: with RESON and TAPE LFO at rest it is the plain delay, and once the filter is in,
+the echoes are soft-limited, so high RES and FDBK ring and sing rather than clip.
 
 The reverb is a feedback network of four lines with four diffusers before it, at half rate. With both its sends at 0
 it switches itself off once its tail has died away. Projects saved by 0.2 load with the reverb off.

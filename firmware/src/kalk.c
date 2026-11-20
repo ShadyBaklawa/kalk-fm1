@@ -51,7 +51,8 @@ static void proj_default(project_t *p)
 {
     static const uint8_t FX0[NFX] = {
         XF_THRU, 64, 32, 1,   3, 4, 50, 0,   50, 90, 127, 0,   127, 0, 64, 0,   64, 64, 64, 0,   64, 12, 0, 40,
-        70, 90, 60, 0,   40, 30, 110, 0};   /* the reverb: there, but its sends at 0 (0.2 projects sound the same) */
+        70, 90, 60, 0,   40, 30, 110, 0,    /* the reverb: there, but its sends at 0 (0.2 projects sound the same) */
+        114, 0, 0, 0,   4, 0, 0, 0};        /* the reson delay: filter open, no LFO depth (the 0.2 delay exactly) */
     /* the demo: A house, B broken, C electro, D half time. x on, X accent, o open hat, O open accented */
     static const char *const PAT[NPAT][NMAIN] = {
         {"X...x...X...x...", "....X.......X...", "x.o.x.oxx.o.x.oX"},
@@ -118,7 +119,8 @@ static const char *const VP_NAMES[NVOICE][NVP] = {
 static const char *const FX_NAMES[NFX] = {
     "XFX", "X", "Y", "MOTION", "DLY L", "DLY R", "FDBK", "SEND", "DAMP", "WIDTH", "XMIX", "MOD>FX",
     "CUT", "RES", "MOD", "TRK", "LO", "MID", "HI", "AMP", "GAIN", "PITCH", "DIRT", "NORM",
-    "TIME", "SIZE", "DAMP", "SEND", "LOW", "MOD", "WIDTH", "DLY>RV"};
+    "TIME", "SIZE", "DAMP", "SEND", "LOW", "MOD", "WIDTH", "DLY>RV",
+    "FREQ", "RES", "FILT", "LO CUT", "LFO", "DMOD", "FM", "INVERT"};
 static const char *const SQ_NAMES[16] = {"LEN", "START", "SWING", "HALF", "TIE LN", "POD LN", "MOD LN", "STRTCH",
                                          "CHAIN", "SLOT", "PATT", "BPM", "REMIX", "EVERY", "SHIFT", "LANES"};
 static const char *const GL_NAMES[4] = {"BPM", "CHAN", "OUT", "SYNC"};
@@ -129,6 +131,7 @@ static const char *const L_XFX[NXF] = {"THRU", "CRUSH", "BPF", "RING", "COMB", "
 static const char *const L_MOTION[] = {"OFF", "PLAY", "SMOOTH"};
 static const char *const L_MODFX[] = {"OFF", "GATE", "MIX", "X"};
 static const char *const L_OFFON[] = {"OFF", "ON"};
+static const char *const L_DLFO[] = {"1/16", "1/8", "1/4", "1/2", "1 BAR", "2 BAR", "4 BAR"};
 static const char *const L_EVERY[] = {"OFF", "8 BAR", "4 BAR", "2 BAR", "1 BAR"};
 static const char *const L_SYNC[] = {"INT", "MIDI"};
 
@@ -146,17 +149,20 @@ static const pref_t PG_VOICE[4][4] = {
 static const char *const PG_VOICE_T[5] = {"SOUND", "FILTER", "SHAPE", "MOD", "LANE"};
 static const pref_t PG_LANE[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_SQ, SQ_SWING}, {K_SQ, SQ_LEN}};
 static const pref_t PG_MODL[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_FX, FX_MODFX}, {K_FX, FX_FMOD}};
-static const pref_t PG_FX[8][4] = {
+static const pref_t PG_FX[10][4] = {
     {{K_FX, FX_XTYPE}, {K_FX, FX_X}, {K_FX, FX_Y}, {K_FX, FX_XAUTO}},
     {{K_FX, FX_DL}, {K_FX, FX_DR}, {K_FX, FX_DFB}, {K_FX, FX_DSEND}},
     {{K_FX, FX_DDAMP}, {K_FX, FX_DWIDTH}, {K_FX, FX_XMIX}, {K_FX, FX_MODFX}},
+    {{K_FX, FX_DFREQ}, {K_FX, FX_DRES}, {K_FX, FX_DFTYPE}, {K_FX, FX_DLO}},
+    {{K_FX, FX_DLFO}, {K_FX, FX_DDMOD}, {K_FX, FX_DFM}, {K_FX, FX_DINV}},
     {{K_FX, FX_FCUT}, {K_FX, FX_FRES}, {K_FX, FX_FMOD}, {K_FX, FX_FTRK}},
     {{K_FX, FX_EQLO}, {K_FX, FX_EQMID}, {K_FX, FX_EQHI}, {K_FX, FX_EQAMP}},
     {{K_FX, FX_GAIN}, {K_FX, FX_PITCH}, {K_FX, FX_DIRT}, {K_FX, FX_NORM}},
     {{K_FX, FX_RTIME}, {K_FX, FX_RSIZE}, {K_FX, FX_RDAMP}, {K_FX, FX_RSEND}},
     {{K_FX, FX_RLOW}, {K_FX, FX_RMOD}, {K_FX, FX_RWIDTH}, {K_FX, FX_RDLY}},
 };
-static const char *const PG_FX_T[8] = {"XFX", "DELAY", "DELAY 2", "FILTER", "EQ", "OUT", "REVERB", "REVERB 2"};
+static const char *const PG_FX_T[10] = {"XFX", "DELAY", "DELAY 2", "RESON", "TAPE LFO", "FILTER", "EQ", "OUT", "REVERB",
+                                         "REVERB 2"};
 static const pref_t PG_SEQ[3][4] = {
     {{K_SQ, SQ_LEN}, {K_SQ, SQ_START}, {K_SQ, SQ_SWING}, {K_SQ, SQ_HALF}},
     {{K_SQ, SQ_TLEN}, {K_SQ, SQ_PLEN}, {K_SQ, SQ_MLEN}, {K_SQ, SQ_STRETCH}},
@@ -170,7 +176,7 @@ static uint32_t npages(void)
 {
     switch (section) {
     case SEC_VOICE: return sel_lane == L_MOD ? 1u : sel_lane >= L_TIE ? 5u : 4u;
-    case SEC_FX: return 8u;
+    case SEC_FX: return 10u;
     case SEC_SEQ: return 3u;
     default: return 1u;
     }
@@ -231,12 +237,16 @@ static pval_t pval(pref_t r)
         switch (r.idx) {
         case FX_XTYPE: v.max = NXF - 1; v.fmt = F_LIST; v.list = L_XFX; break;
         case FX_XAUTO: v.max = 2; v.fmt = F_LIST; v.list = L_MOTION; break;
-        case FX_DL: case FX_DR: v.min = 1; v.max = 16; v.fmt = F_TICKS; break;
+        case FX_DL: case FX_DR: v.max = 16; v.fmt = F_TICKS; break;   /* 0: CHORUS (a few ms) */
         case FX_MODFX: v.max = 3; v.fmt = F_LIST; v.list = L_MODFX; break;
         case FX_FCUT: v.fmt = F_HZ; break;
         case FX_FMOD: case FX_EQLO: case FX_EQMID: case FX_EQHI: v.fmt = F_BIP; break;
         case FX_PITCH: v.max = 24; v.fmt = F_SEMI; break;
         case FX_RTIME: v.fmt = F_RT; break;
+        case FX_DFREQ: v.max = 114; v.fmt = F_HZ; break;   /* (at half rate: up to ~9 kHz) */
+        case FX_DFTYPE: v.max = 2; v.fmt = F_LIST; v.list = L_FILT; break;
+        case FX_DLFO: v.max = 6; v.fmt = F_LIST; v.list = L_DLFO; break;
+        case FX_DINV: v.max = 1; v.fmt = F_LIST; v.list = L_OFFON; break;
         }
         break;
     case K_SQ:
@@ -330,7 +340,7 @@ static void fmt_val(const pval_t *v, char *d)
     case F_BIP: put_i(d, x - 64); break;
     case F_PLUS1: put_u(d, (uint32_t)x + 1u); break;
     case F_PCT: d = put_u(d, (uint32_t)x); put_s(d, "%"); break;
-    case F_TICKS: d = put_u(d, (uint32_t)x); put_s(d, "/16"); break;
+    case F_TICKS: if (!x) put_s(d, "CHORUS"); else { d = put_u(d, (uint32_t)x); put_s(d, "/16"); } break;
     case F_MASK3:
         d[0] = v->p == &P.stretch ? (x & 1 ? 'T' : '-') : (x & 1 ? 'K' : '-');
         d[1] = v->p == &P.stretch ? (x & 2 ? 'P' : '-') : (x & 2 ? 'S' : '-');
