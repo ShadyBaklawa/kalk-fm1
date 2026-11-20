@@ -1,0 +1,39 @@
+# KALK GRAIN / SPEED demo (step 5), 124 BPM: kick on BDRUM, snare on SNARE (the VCSL samples), two bars plain; then on
+# the kick's GRAIN page SPEED 50 % (twice as long, the same pitch), GRAIN up; the snare at 198 % with tiny grains;
+# (the kick's DECAY up a little, so the stretch shows)
+# the kick's head held (SPEED 0: its attack in grains); back to rest
+100 btn 12
+200 enc 4 20
+210 enc 3 12
+300 keys 0x8
+350 keys 0
+400 enc 4 20
+3900 keys 0x2
+3950 keys 0
+4000 enc 0 1
+4010 enc 0 1
+4020 enc 0 1
+4030 enc 0 1
+4040 enc 3 -11
+4200 shot
+7900 enc 2 20
+8000 shot
+11800 keys 0x8
+11850 keys 0
+11900 enc 3 21
+11910 enc 2 13
+11920 enc 4 -12
+12100 shot
+15700 keys 0x2
+15750 keys 0
+15800 enc 3 -11
+16000 shot
+19500 enc 2 -21
+19510 enc 3 21
+19520 keys 0x8
+19530 keys 0
+19540 enc 2 -13
+19550 enc 3 -21
+19560 enc 4 12
+23400 btn 12
+25000 end

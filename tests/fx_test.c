@@ -284,6 +284,25 @@ int main(void)
         check(same && t2.magic == PROJ_MAGIC, "0.2 project upgrade: its steps, sounds, effects and motion kept; reverb from defaults");
     }
 
+    /* a 0.3 project (step 4's layout): everything it had is kept; the EXTRA pages and fx2[] keep their defaults */
+    {
+        static project03_t o;
+        static project_t t3;
+        int same = 1;
+        check(sizeof(project03_t) != sizeof(project_t) && sizeof(project03_t) != sizeof(project02_t),
+              "0.2, 0.3 and new projects differ in size (the store tells them apart)");
+        for (i = 0; i < sizeof o; i++) ((uint8_t *)&o)[i] = (uint8_t)(i * 5u + 3u);
+        o.magic = PROJ_MAGIC;
+        memset(&t3, 0xAA, sizeof t3);
+        proj_upgrade03(&t3, &o);
+        if (memcmp(&t3, o.head, sizeof o.head)) same = 0;
+        for (i = 0; i < sizeof t3.vx; i++) if (((uint8_t *)t3.vx)[i] != 0xAA) same = 0;
+        for (i = 0; i < NFX2; i++) if (t3.fx2[i] != 0xAA) same = 0;
+        check(same && t3.magic == PROJ_MAGIC, "0.3 project upgrade: all of it kept; GRAIN, FOLLOW, PULP from defaults");
+        check(VX_DEFAULT[0][VX_GRAIN] == 0 && VX_DEFAULT[0][VX_SPEED] == 64 && VX_DEFAULT[1][VX_SPEED] == 64,
+              "GRAIN / SPEED at rest by default (0.3 projects sound the same)");
+    }
+
     if (w) {                                    /* the WAV header */
         uint32_t n = (uint32_t)ftell(w) - 44u, v;
         fseek(w, 0, SEEK_SET);

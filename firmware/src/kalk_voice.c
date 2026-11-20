@@ -26,6 +26,9 @@ typedef struct {
     svf_t f;
     const ksmp_t *sm;                           /* WAV 17..24: a sample (inc, tinc: its step, Q16) */
     uint32_t spos;                              /* where in it, Q16 */
+    /* GRAIN (kick, snare samples): two grains a half apart; spos is the head, moving at SPEED */
+    uint8_t grn;                                /* on */
+    uint32_t gp[2], gph[2], glen, grcp, gjit, gspd;   /* grain read points (Q16), phases, length, Q31/len, jitter, head step */
 } voice_t;
 static voice_t V[NV_RUN];
 static volatile int8_t mod_now;                /* the mod lane's value now (0..15) */
@@ -71,6 +74,15 @@ static const uint8_t VP_DEFAULT[NVOICE][NVP] = {
     {24, 44, 0, 100, 92, 10, 2, 72, 74, 1, 20, 0, 0, 64, 60, 0},      /* hat: (closed decay) OPEN LINK NOISE HOLD */
     {24, 62, 2, 92, 78, 50, 0, 64, 52, 8, 34, 0, 0, 64, 40, 0},       /* tie: FM RATIO PORT ATTACK; START = NOISE */
     {24, 44, 0, 90, 127, 0, 0, 44, 60, 30, 8, 0, 2, 92, 50, 0},       /* pod: ZAP ZAPDEC NOISE HOLD; the mod lane on pitch */
+};
+
+/* (after 0.3) each voice's EXTRA page: at rest (0.2 and 0.3 projects sound the same) */
+static const uint8_t VX_DEFAULT[NVOICE][4] = {
+    {0, 64, 40, 0},                             /* kick: GRAIN off, SPEED 1x, SIZE ~30 ms */
+    {0, 64, 40, 0},                             /* snare */
+    {0, 64, 64, 0},                             /* hat: NOISE mode (as before) */
+    {0, 0, 0, 0},                               /* tie: the FM envelope as before, no drop */
+    {0, 0, 0, 0},                               /* pod: (none) */
 };
 
 static uint32_t decay_k(int32_t i) { return DECAY_K[clampi(i, 0, 127)]; }
@@ -211,6 +223,20 @@ static void voice_trigger(uint32_t vi, uint32_t acc, int32_t semi, int32_t vel)
             v->hold = (uint32_t)DECAY_MS[di] * 22u + (uint32_t)p[VP_X4] * 44u;   /* half the decay time + HOLD */
         }
         v->nmix = 0;
+        v->grn = 0;
+        if (vi == V_KICK || vi == V_SNARE) {    /* GRAIN / SPEED (after 0.3): at rest, the plain player */
+            const uint8_t *g = P.vx[vi];
+            if (g[VX_GRAIN] || g[VX_SPEED] != 64u) {
+                v->grn = 1;
+                v->glen = 220u + (uint32_t)g[VX_GSIZE] * 28u;   /* 5 .. 86 ms */
+                v->grcp = 0x80000000u / v->glen;
+                v->gjit = (uint32_t)g[VX_GRAIN] * 70u;           /* the start jumps up to ~200 ms on */
+                v->gspd = (uint32_t)(((uint64_t)step * g[VX_SPEED]) >> 6);   /* SPEED 64: 1x, 0: held, 127: ~2x */
+                v->gp[0] = v->gp[1] = v->spos;
+                v->gph[0] = v->glen / 2u;       /* (the first grain at its peak: the attack is there) */
+                v->gph[1] = 0;
+            }
+        }
     }
     v->on = 1;
 }
@@ -371,11 +397,42 @@ static void render_sample(voice_t *v, int32_t *out, uint32_t n)
     }
 }
 
+/* GRAIN: the head moves at SPEED, the grains read at the pitch; each grain starts again at the head, GRAIN later */
+static void render_grain(voice_t *v, int32_t *out, uint32_t n)
+{
+    const uint8_t *d = SMP_DATA + v->sm->off;
+    uint32_t i, g, last = v->sm->len - 1u;
+    for (i = 0; i < n; i++) {
+        int32_t s = 0;
+        if (v->flam && --v->flam == 0u) { v->spos = 0; v->env = ENV_ONE - (ENV_ONE >> 2); }   /* snare: FLAM */
+        if ((v->spos >> 16) >= last || !env_step(v)) { v->on = 0; return; }
+        for (g = 0; g < 2u; g++) {
+            uint32_t k = v->gp[g] >> 16, f, w;
+            if (++v->gph[g] >= v->glen) {       /* a new grain: from the head, and on by up to GRAIN */
+                v->gph[g] = 0;
+                v->gp[g] = v->spos + ((v->gjit ? (uint32_t)(((uint64_t)rnd() * v->gjit) >> 32) : 0u) << 16);
+                k = v->gp[g] >> 16;
+            }
+            f = (uint32_t)(((uint64_t)v->gph[g] * v->grcp) >> 15);   /* 0..65535 through the grain */
+            w = f < 32768u ? f : 65536u - f;    /* a triangle: the two add up to one */
+            if (k < last) {
+                int32_t a = MULAW_T[d[k]], b = MULAW_T[d[k + 1u]];
+                a += ((b - a) * (int32_t)((v->gp[g] >> 1) & 0x7FFFu)) >> 15;
+                s += (int32_t)(((int64_t)a * (int32_t)w) >> 15);
+            }
+            v->gp[g] += v->inc;
+        }
+        v->spos += v->gspd;
+        if (v->drv > 300) s = drive15(s, v->drv);
+        voice_out(v, out, i, MUL15(s, (int32_t)(v->env >> 15)));
+    }
+}
+
 static void voices_render(int32_t *out, uint32_t n)
 {
     uint32_t k;
     for (k = 0; k < NV_RUN; k++)                /* the samples first (one loop for all) */
-        if (V[k].on && V[k].sm) render_sample(&V[k], out, n);
+        if (V[k].on && V[k].sm) { if (V[k].grn) render_grain(&V[k], out, n); else render_sample(&V[k], out, n); }
     if (V[V_KICK].on && !V[V_KICK].sm) render_kick(&V[V_KICK], out, n);
     if (V[V_SNARE].on && !V[V_SNARE].sm) render_snare(&V[V_SNARE], out, n);
     if (V[V_HATC].on && !V[V_HATC].sm) render_hat(&V[V_HATC], out, n);

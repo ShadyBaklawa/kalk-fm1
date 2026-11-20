@@ -80,6 +80,14 @@ from [VCSL](https://github.com/sgossner/VCSL) by Versilian Studios. All CC0 1.0:
 `tools/gen_samples.py` rebuilds the banks (8-bit mu-law, in the app's flash); `python3 tools/gen_vogel.py` renders
 the synthesised candidates to `build/vogel/` to audition.
 
+### The EXTRA page (the last of a voice's pages)
+
+| | K1 | K2 | K3 | K4 |
+| --- | --- | --- | --- | --- |
+| **KICK**, **SNARE**: GRAIN (on the samples) | GRAIN: each grain starts up to ~200 ms further on (OFF: none) | SPEED: how fast the sample goes by, 0-198 % (100 %: as recorded); the pitch stays | SIZE: the grains, 5-86 ms | |
+
+At GRAIN OFF and SPEED 100 % the sample plays as before. A project saved by 0.2 or 0.3 loads with the EXTRA pages at rest.
+
 ## The sequence
 
 - **Main**: KICK, SNARE, HAT in patterns A-D. SEQ > MAIN: LEN 1-16, START, SWING, HALF (half tempo).

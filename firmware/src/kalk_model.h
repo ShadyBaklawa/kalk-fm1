@@ -13,6 +13,7 @@
 #define NVP 16u                                 /* parameters per voice */
 #define NFX 40u                                /* (0.2 had 24: the reverb and the reson delay came after) */
 #define NFX02 24u
+#define NFX2 16u                                /* (after 0.3) fx2[]: FOLLOW 0..3, PULP 4..11 */
 #define NXY 64u                                 /* XFX motion: 64 points (4 bars of 16ths) */
 #define NCHAIN 8u
 
@@ -45,6 +46,15 @@ enum {
     FX_DFREQ, FX_DRES, FX_DFTYPE, FX_DLO,       /* reson delay: the filter in the loop (LP BP HP), low cut going in */
     FX_DLFO, FX_DDMOD, FX_DFM, FX_DINV,         /* its LFO (synced), on the time (tape), on the cutoff; feedback inverted */
 };
+/* each voice's EXTRA page (vx[voice][]) */
+enum { VX_GRAIN, VX_SPEED, VX_GSIZE };          /* kick, snare (samples): grain jitter, speed (64 = 1x), grain size */
+enum { VX_808, VX_TONE, VX_COLOR, VX_SNAP };    /* hat: NOISE / 808 mode, its band passes' centre and balance, the attack */
+enum { VX_FMA, VX_FMD, VX_DROP, VX_FMNZ };      /* tie: FM envelope attack and decay (0: as before), pitch drop, noise FM */
+/* fx2[] */
+enum { F2_BEAT, F2_BATK, F2_BREL, F2_BSRC,      /* FOLLOW: amount (64: off), attack, release, source */
+       F2_PLVL, F2_PLO, F2_PHI, F2_PDEC,        /* PULP: level (0: off), the tracker's range, decay */
+       F2_PWAVE, F2_PTRIG, F2_PGLIDE, F2_PPAN }; /* PULP 2: wave, what strikes it, how fast it follows, pan */
+enum { BS_MIX, BS_KICK, BS_KS, BS_DRUMS };      /* FOLLOW's source (and PULP's trigger) */
 enum { XF_THRU, XF_CRUSH, XF_BPF, XF_RING, XF_COMB, XF_REPEAT, XF_LPF, XF_HPF, XF_FOLD, XF_GATE, XF_PAN, XF_FLANGE,
        XF_CHOP, XF_SLICE, XF_FREEZE, XF_SPIN, XF_REFLEX, XF_PITCH, NXF };   /* (after 0.2: 0.2 has no type >= 12) */
 
@@ -69,6 +79,9 @@ typedef struct {
     uint8_t gmode, grate, gdepth, gsmooth;      /* OFF / PRE (before the effects) / POST; 1/8 1/16 1/32; how much; ramp */
     uint8_t r2depth, r2rate, r2shape, r2pad;    /* RMX LFO: steps it pushes the play position, its cycle, its shape */
     uint8_t pad[3];
+    /* (after 0.3) */
+    uint8_t vx[NVOICE][4];                      /* each voice's EXTRA page: kick, snare GRAIN; hat 808; tie FM ENV */
+    uint8_t fx2[NFX2];                          /* more effects: FOLLOW (the beat-following low pass), PULP */
     uint32_t magic;                             /* PROJ_MAGIC: a valid project */
 } project_t;
 enum { GM_OFF, GM_PRE, GM_POST };
@@ -84,6 +97,20 @@ typedef struct {
     uint8_t pad[3];
     uint32_t magic;
 } project02_t;
+
+/* a project as 0.3 saved it (step 4's layout, commit 038db4a): everything up to vx[], then the magic */
+typedef struct {
+    uint8_t head[offsetof(project_t, vx)];
+    uint32_t magic;
+} project03_t;
+_Static_assert(sizeof(project03_t) == 592u, "the 0.3 layout as it was saved");
+
+static void proj_upgrade03(project_t *t, const project03_t *o)
+{
+    uint32_t i;
+    for (i = 0; i < sizeof o->head; i++) ((uint8_t *)t)[i] = o->head[i];
+    t->magic = o->magic;
+}
 
 /* a 0.2 project into t, which already holds the defaults: everything 0.2 had is copied, the rest stays */
 static void proj_upgrade02(project_t *t, const project02_t *o)

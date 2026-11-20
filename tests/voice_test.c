@@ -23,6 +23,7 @@ int main(void)
     FILE *w = fopen(getenv("OUT") ? getenv("OUT") : "build/host/voices.wav", "wb");
     uint32_t vi, var, fails = 0, total = 0;
     memcpy(P.vp, VP_DEFAULT, sizeof VP_DEFAULT);
+    memcpy(P.vx, VX_DEFAULT, sizeof VX_DEFAULT);
     if (getenv("VP")) {                         /* VP=voice,param,value: try a setting */
         int a, b, c;
         if (sscanf(getenv("VP"), "%d,%d,%d", &a, &b, &c) == 3) P.vp[a][b] = (uint8_t)c;
@@ -67,5 +68,49 @@ int main(void)
         fclose(w);
     }
     printf("(peak %% / rms %% of the first 100 ms / ms to -40 dB)\n%u of %u variants failed (silent, clipping or endless)\n", fails, total);
+
+    /* GRAIN / SPEED (after 0.3) on the kick and snare samples: at rest the plain player; SPEED stretches the sample
+     * without changing its pitch; GRAIN moves the grains' starts; bounded */
+    {
+        static int32_t ref[2 * N];
+        uint32_t i, sv;
+        for (sv = 0; sv < 2u; sv++) {
+            uint32_t ends[3], kk;
+            double pk_g = 0, diff = 0, zc[3];
+            static const uint8_t SPD[3] = {32, 64, 127};
+            P.vp[sv][VP_WAV] = 20; P.vp[sv][VP_DECAY] = 127; P.vp[sv][VP_X4] = 127;   /* a long hold: the length shows */
+            for (kk = 0; kk < 3u; kk++) {
+                double lastv = 0; uint32_t z = 0;
+                P.vx[sv][VX_SPEED] = SPD[kk]; P.vx[sv][VX_GRAIN] = 0;
+                memset(buf, 0, sizeof buf); memset(&V[sv], 0, sizeof V[sv]);
+                voice_trigger(sv, 1, 0, 32767);
+                if (kk == 1u && V[sv].grn) fails++;   /* (at rest: not the grain player) */
+                for (i = 0; i < N; i += 32u) voices_render(buf + 2u * i, 32u);
+                ends[kk] = 0;
+                for (i = 0; i < N; i++) {
+                    if (buf[2u * i]) ends[kk] = i;
+                    if (i < 2000u) { double x = buf[2u * i]; if ((x > 0) != (lastv > 0)) z++; lastv = x; }
+                }
+                zc[kk] = z;
+                if (kk == 1u) memcpy(ref, buf, sizeof buf);
+            }
+            printf("%s sample SPEED 50 / 100 / 198 %%: lasts %u / %u / %u ms; zero crossings in 45 ms %0.f / %0.f / %0.f\n",
+                   sv ? "SNARE" : "KICK", ends[0] * 1000u / FS, ends[1] * 1000u / FS, ends[2] * 1000u / FS, zc[0], zc[1], zc[2]);
+            if (!(ends[0] > ends[1] * 17 / 10 && ends[2] < ends[1] * 7 / 10)) { printf("FAIL SPEED: the length\n"); fails++; }
+            if (fabs(zc[0] - zc[1]) > zc[1] * 0.35 || fabs(zc[2] - zc[1]) > zc[1] * 0.35) { printf("FAIL SPEED: the pitch moved\n"); fails++; }
+            P.vx[sv][VX_SPEED] = 64; P.vx[sv][VX_GRAIN] = 127;
+            memset(buf, 0, sizeof buf); memset(&V[sv], 0, sizeof V[sv]);
+            voice_trigger(sv, 1, 0, 32767);
+            for (i = 0; i < N; i += 32u) voices_render(buf + 2u * i, 32u);
+            for (i = 0; i < N; i++) {
+                double a = fabs(buf[2u * i] / 32768.0);
+                if (a > pk_g) pk_g = a;
+                diff += fabs((double)buf[2u * i] - ref[2u * i]);
+            }
+            printf("%s GRAIN 127: peak %.2f, differs from GRAIN 0 by %.0f\n", sv ? "SNARE" : "KICK", pk_g, diff);
+            if (pk_g > 0.99 || pk_g < 0.02 || diff < 1e5) { printf("FAIL GRAIN\n"); fails++; }
+            memcpy(P.vp, VP_DEFAULT, sizeof VP_DEFAULT); memcpy(P.vx, VX_DEFAULT, sizeof VX_DEFAULT);
+        }
+    }
     return fails ? 1 : 0;
 }

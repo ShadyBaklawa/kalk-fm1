@@ -47,6 +47,8 @@ __attribute__((noinline)) static void app_audio(int32_t *out, uint32_t n)
 }
 
 /* ======================================================================== the project */
+/* (after 0.3) fx2[]: everything at rest (0.2 and 0.3 projects sound the same); VX_DEFAULT: kalk_voice.c */
+static const uint8_t FX2_0[NFX2] = {64, 10, 50, BS_KICK,   0, 20, 90, 50,   0, BS_KS, 80, 64};
 static void proj_default(project_t *p)
 {
     static const uint8_t FX0[NFX] = {
@@ -89,6 +91,8 @@ static void proj_default(project_t *p)
     for (a = 0; a < NVOICE; a++) for (l = 0; l < NVP; l++) p->vp[a][l] = VP_DEFAULT[a][l];
     for (l = 0; l < NFX; l++) p->fx[l] = FX0[l];
     for (s = 0; s < NXY; s++) p->xy[s][0] = p->xy[s][1] = 255;
+    for (a = 0; a < NVOICE; a++) for (l = 0; l < 4u; l++) p->vx[a][l] = VX_DEFAULT[a][l];
+    for (l = 0; l < NFX2; l++) p->fx2[l] = FX2_0[l];
     p->magic = PROJ_MAGIC;
 }
 
@@ -96,13 +100,13 @@ static struct { uint8_t slot, ch, out, sync; uint32_t magic; } set;
 #define SET_MAGIC 0x4B53u
 
 /* ======================================================================== the parameters on the screen */
-enum { K_VP, K_FX, K_SQ, K_GL, K_SL };          /* voice, effects, sequence, global, the selected second-window lane */
+enum { K_VP, K_FX, K_SQ, K_GL, K_SL, K_VX, K_F2 };   /* (K_VX, K_F2: after 0.3: the EXTRA pages, fx2[]) */          /* voice, effects, sequence, global, the selected second-window lane */
 enum { SQ_LEN, SQ_START, SQ_SWING, SQ_HALF, SQ_TLEN, SQ_PLEN, SQ_MLEN, SQ_STRETCH, SQ_CHAIN, SQ_SLOT, SQ_CPAT, SQ_BPM,
        SQ_RMX, SQ_RFREQ, SQ_RSHIFT, SQ_RLANES, SQ_R2DEPTH, SQ_R2RATE, SQ_R2SHAPE, SQ_GMODE, SQ_GRATE, SQ_GDEPTH,
        SQ_GSMOOTH, NSQ };
 enum { GL_BPM, GL_CH, GL_OUT, GL_SYNC };
 enum { SL_LEN, SL_STRETCH };
-enum { F_WAV, F_NUM, F_SEMI, F_MS, F_HZ, F_LIST, F_PAN, F_BIP, F_PLUS1, F_PCT, F_TICKS, F_MASK3, F_CHAIN, F_PAT, F_OMNI, F_LEN, F_RT };
+enum { F_WAV, F_NUM, F_SEMI, F_MS, F_HZ, F_LIST, F_PAN, F_BIP, F_PLUS1, F_PCT, F_TICKS, F_MASK3, F_CHAIN, F_PAT, F_OMNI, F_LEN, F_RT, F_SPEED, F_GMS, F_OFFN };
 typedef struct { uint8_t kind, idx; } pref_t;
 
 static const char *const LANE_LONG[NLANE] = {"KICK", "SNARE", "HAT", "TIE", "POD", "MOD"};
@@ -156,6 +160,13 @@ static const pref_t PG_VOICE[4][4] = {
     {{K_VP, VP_MODDST}, {K_VP, VP_MODAMT}, {K_VP, VP_ACC}, {K_VP, VP_START}},
 };
 static const char *const PG_VOICE_T[5] = {"SOUND", "FILTER", "SHAPE", "MOD", "LANE"};
+/* the EXTRA page (after 0.3): which voices have one yet, its title and its names */
+static const uint8_t VX_ON[NVOICE] = {1, 1, 0, 0, 0};
+static const char *const VX_T[NVOICE] = {"GRAIN", "GRAIN", "808", "FM ENV", ""};
+static const pref_t PG_VX[4] = {{K_VX, 0}, {K_VX, 1}, {K_VX, 2}, {K_VX, 3}};
+static const char *const VX_NAMES[NVOICE][4] = {
+    {"GRAIN", "SPEED", "SIZE", ""}, {"GRAIN", "SPEED", "SIZE", ""}, {"808", "TONE", "COLOR", "SNAP"},
+    {"FM ATK", "FM DEC", "DROP", "NOISFM"}, {"", "", "", ""}};
 static const pref_t PG_LANE[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_SQ, SQ_SWING}, {K_SQ, SQ_LEN}};
 static const pref_t PG_MODL[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_FX, FX_MODFX}, {K_FX, FX_FMOD}};
 #define NPG_FX 10u                              /* the FX pages (XFX is the first) */
@@ -189,10 +200,11 @@ static const char *const PG_RMX_T[3] = {"", "LFO", "GATE"};
 static int gate_edit(void);
 static const pref_t PG_GLO[4] = {{K_GL, GL_BPM}, {K_GL, GL_CH}, {K_GL, GL_OUT}, {K_GL, GL_SYNC}};
 
+static uint32_t voice_of_lane(void) { return sel_lane < NVOICE ? sel_lane : 0u; }
 static uint32_t npages(void)
 {
     switch (section) {
-    case SEC_VOICE: return sel_lane == L_MOD ? 1u : sel_lane >= L_TIE ? 5u : 4u;
+    case SEC_VOICE: return sel_lane == L_MOD ? 1u : (sel_lane >= L_TIE ? 5u : 4u) + VX_ON[voice_of_lane()];
     case SEC_FX: return NPG_FX;
     case SEC_SEQ: return 3u;
     case SEC_RMX: return 3u;
@@ -205,6 +217,7 @@ static const pref_t *page_refs(void)
     switch (section) {
     case SEC_VOICE:
         if (sel_lane == L_MOD) return PG_MODL;
+        if (pg == npages() - 1u && VX_ON[voice_of_lane()]) return PG_VX;   /* (the EXTRA page is the last) */
         return pg == 4u ? PG_LANE : PG_VOICE[pg];
     case SEC_FX: return PG_FX[pg];
     case SEC_SEQ: return PG_SEQ[pg];
@@ -216,14 +229,15 @@ static const char *page_title(void)
 {
     uint32_t pg = page[section] % npages();
     switch (section) {
-    case SEC_VOICE: return sel_lane == L_MOD ? "LANE" : PG_VOICE_T[pg];
+    case SEC_VOICE:
+        if (sel_lane == L_MOD) return "LANE";
+        return pg == npages() - 1u && VX_ON[voice_of_lane()] ? VX_T[voice_of_lane()] : PG_VOICE_T[pg];
     case SEC_FX: return PG_FX_T[pg];
     case SEC_SEQ: return PG_SEQ_T[pg];
     case SEC_RMX: return PG_RMX_T[pg];
     default: return "";
     }
 }
-static uint32_t voice_of_lane(void) { return sel_lane < NVOICE ? sel_lane : 0u; }
 
 /* the value behind a reference: its byte, its range, its format */
 typedef struct { uint8_t *p; int32_t min, max; uint8_t fmt; const char *const *list; const char *name; uint8_t bit; } pval_t;
@@ -303,6 +317,14 @@ static pval_t pval(pref_t r)
         case GL_SYNC: v.p = &set.sync; v.max = 1; v.fmt = F_LIST; v.list = L_SYNC; break;
         }
         break;
+    case K_VX: {
+        uint32_t vi = voice_of_lane();
+        v.name = VX_NAMES[vi][r.idx];
+        if (!v.name[0]) break;                  /* (no parameter here) */
+        v.p = &P.vx[vi][r.idx];
+        if (vi <= 1u) v.fmt = r.idx == VX_GRAIN ? F_OFFN : r.idx == VX_SPEED ? F_SPEED : F_GMS;
+        break;
+    }
     case K_SL:
         if (r.idx == SL_LEN) { v.p = &P.slen[sec]; v.min = 1; v.max = 16; v.name = "LEN"; }
         else { v.p = &P.stretch; v.max = 1; v.fmt = F_LIST; v.list = L_OFFON; v.name = "STRTCH"; v.bit = (uint8_t)(1u << sec); }
@@ -376,6 +398,9 @@ static void fmt_val(const pval_t *v, char *d)
     case F_CHAIN: if (x < 2) put_s(d, "OFF"); else { d = put_u(d, (uint32_t)x); put_s(d, " BAR"); } break;
     case F_PAT: d[0] = (char)('A' + x); d[1] = 0; break;
     case F_OMNI: if (!x) put_s(d, "OMNI"); else put_u(d, (uint32_t)x); break;
+    case F_SPEED: d = put_u(d, (uint32_t)x * 100u / 64u); put_s(d, "%"); break;   /* 64: 100 % */
+    case F_GMS: d = put_u(d, (220u + (uint32_t)x * 28u) / 44u); put_s(d, "ms"); break;
+    case F_OFFN: if (!x) put_s(d, "OFF"); else put_u(d, (uint32_t)x); break;
     default:
         if (v->p == &P.remix && !x) put_s(d, "OFF");
         else put_u(d, (uint32_t)x);
@@ -744,7 +769,10 @@ static int proj_load(uint32_t slot)
 {
     static project_t t;
     static project02_t o;
+    static project03_t o3;
     if (!blob_load(slot, &t, sizeof t) && t.magic == PROJ_MAGIC) { P = t; return 0; }
+    /* a 0.3 project: the same up to the EXTRA pages and fx2[], which get their defaults */
+    if (!blob_load(slot, &o3, sizeof o3) && o3.magic == PROJ_MAGIC) { proj_default(&t); proj_upgrade03(&t, &o3); P = t; return 0; }
     /* a 0.2 project: the same up to the effects, which were fewer; the new ones get their defaults */
     if (blob_load(slot, &o, sizeof o) || o.magic != PROJ_MAGIC) return -1;
     proj_default(&t);
