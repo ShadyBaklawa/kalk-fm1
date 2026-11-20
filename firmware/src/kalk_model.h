@@ -13,6 +13,7 @@
 #define NVP 16u                                 /* parameters per voice */
 #define NFX 40u                                /* (0.2 had 24: the reverb and the reson delay came after) */
 #define NFX02 24u
+#define NTOR 24u                                /* (after the 0.3 release) tor[]: TORSION */
 #define NFX2 16u                                /* (after 0.3) fx2[]: FOLLOW 0..3, PULP 4..11 */
 #define NXY 64u                                 /* XFX motion: 64 points (4 bars of 16ths) */
 #define NCHAIN 8u
@@ -54,7 +55,10 @@ enum { VX_FMA, VX_FMD, VX_DROP, VX_FMNZ };      /* tie: FM envelope attack and d
 enum { F2_BEAT, F2_BATK, F2_BREL, F2_BSRC,      /* FOLLOW: amount (64: off), attack, release, source */
        F2_PLVL, F2_PLO, F2_PHI, F2_PDEC,        /* PULP: level (0: off), the tracker's range, decay */
        F2_PWAVE, F2_PTRIG, F2_PGLIDE, F2_PPAN }; /* PULP 2: wave, what strikes it, how fast it follows, pan */
-enum { BS_MIX, BS_KICK, BS_KS, BS_DRUMS };      /* FOLLOW's source (and PULP's trigger) */
+enum { BS_MIX, BS_KICK, BS_KS, BS_DRUMS };
+/* tor[]: TORSION (after boscomac's Bit Torsion: our own code). The first 12 are the ones ANIM can move (TA_ bits) */
+enum { T_BITS, T_RATE, T_DRIVE, T_CUT, T_RES, T_NBP, T_FDBK, T_FOLD, T_CLIP, T_SPREAD, T_GATE, T_LEVEL, NT_ANIM,
+       T_PRESET = NT_ANIM, T_BLEND, T_DEPTH, T_LEN, T_DENS, T_SEED, T_STEP, T_ANIM_LO, T_ANIM_HI };      /* FOLLOW's source (and PULP's trigger) */
 enum { XF_THRU, XF_CRUSH, XF_BPF, XF_RING, XF_COMB, XF_REPEAT, XF_LPF, XF_HPF, XF_FOLD, XF_GATE, XF_PAN, XF_FLANGE,
        XF_CHOP, XF_SLICE, XF_FREEZE, XF_SPIN, XF_REFLEX, XF_PITCH, NXF };   /* (after 0.2: 0.2 has no type >= 12) */
 
@@ -82,6 +86,8 @@ typedef struct {
     /* (after 0.3) */
     uint8_t vx[NVOICE][4];                      /* each voice's EXTRA page: kick, snare GRAIN; hat 808; tie FM ENV */
     uint8_t fx2[NFX2];                          /* more effects: FOLLOW (the beat-following low pass), PULP */
+    /* (after 0.3, the release) */
+    uint8_t tor[NTOR];                          /* TORSION: the animated distortion (T_...) */
     uint32_t magic;                             /* PROJ_MAGIC: a valid project */
 } project_t;
 enum { GM_OFF, GM_PRE, GM_POST };
@@ -98,18 +104,19 @@ typedef struct {
     uint32_t magic;
 } project02_t;
 
-/* a project as 0.3 saved it (step 4's layout, commit 038db4a): everything up to vx[], then the magic */
-typedef struct {
-    uint8_t head[offsetof(project_t, vx)];
-    uint32_t magic;
-} project03_t;
-_Static_assert(sizeof(project03_t) == 592u, "the 0.3 layout as it was saved");
+/* the layouts since 0.2 only grew at the end: a project as one of them saved it is the same up to a point, then its
+ * magic. The 0.3 release (vx[] and fx2[] in, no tor[]) and step 4's build before it (commit 038db4a, neither) */
+typedef struct { uint8_t head[offsetof(project_t, tor)]; uint32_t magic; } project03_t;
+typedef struct { uint8_t head[offsetof(project_t, vx)]; uint32_t magic; } project_s4_t;
+_Static_assert(sizeof(project03_t) == 628u, "the 0.3 release's layout as it was saved");
+_Static_assert(sizeof(project_s4_t) == 592u, "step 4's layout as it was saved");
 
-static void proj_upgrade03(project_t *t, const project03_t *o)
+/* such a project (n bytes of head) into t, which already holds the defaults */
+static void proj_upgrade_head(project_t *t, const uint8_t *head, uint32_t n, uint32_t magic)
 {
     uint32_t i;
-    for (i = 0; i < sizeof o->head; i++) ((uint8_t *)t)[i] = o->head[i];
-    t->magic = o->magic;
+    for (i = 0; i < n; i++) ((uint8_t *)t)[i] = head[i];
+    t->magic = magic;
 }
 
 /* a 0.2 project into t, which already holds the defaults: everything 0.2 had is copied, the rest stays */

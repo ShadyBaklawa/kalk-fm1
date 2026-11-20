@@ -24,6 +24,11 @@
  *            the pitch of what plays: zero crossings of the drums, low passed at HI, periods between LO and HI;
  *            GLIDE how fast it follows, DECAY, WAVE (sine .. triangle .. square), PAN; LEVEL 0: off. Before the
  *            effects, so they take it too
+ *   TORSION  (after the 0.3 release) an animated distortion, after boscomac's Bit Torsion (its behaviour; our own
+ *            code): CRUSH (bits, rate) -> a notch .. band pass filter with resonance and FEEDBACK from the end -> DRIVE
+ *            -> FOLD -> CLIP -> SPREAD (stereo from mono) -> GATE -> LEVEL, BLEND with the dry (0: off, nothing runs).
+ *            ANIM: any of the first 12 driven by a random step sequence (LENGTH 1..64 steps of STEP, DENSITY: how
+ *            many steps change, DEPTH: how far and which way, SEED: which sequence, the same every time)
  *   GATE     (while playing) a 16-step lane at 1/8, 1/16 or 1/32 that cuts the sound on its steps: PRE (before the
  *            effects: the echoes and the reverb ring on) or POST (after them: hard cuts); DEPTH, SMOOTH (the ramp)
  */
@@ -739,12 +744,156 @@ static void pulp(int32_t *b, uint32_t n)
     }
 }
 
+/* ---- TORSION (after the 0.3 release) */
+#define TSP_LEN 512u                            /* SPREAD's delay: ~7.5 ms of the mid */
+static int16_t tsp_buf[TSP_LEN];
+static struct {
+    uint8_t sum;                                /* tor[]'s checksum the targets are for */
+    uint32_t idx;                               /* the ANIM step they are for */
+    uint8_t tgt[NT_ANIM];                       /* where each parameter is going */
+    int32_t ev[NT_ANIM];                        /* where it is, Q8 (a few ms behind: no zipper) */
+    uint8_t on;
+    svf_t f[2]; int32_t fcut, fres;
+    int32_t fb[2], hold[2]; uint32_t hacc;
+    int32_t genv, gg;
+    uint32_t sw;
+} T = {.fcut = -1};
+
+static uint32_t thash(uint32_t a)               /* a 32-bit mix (lowbias32): the random sequences, from the SEED */
+{
+    a ^= a >> 16; a *= 0x7FEB352Du; a ^= a >> 15; a *= 0x846CA68Bu; a ^= a >> 16;
+    return a;
+}
+/* ANIM: parameter p's random value (0..255) at step k: the value of the last step at or before k that changes */
+static uint32_t tanim(uint32_t p, uint32_t k)
+{
+    uint32_t seed = (uint32_t)P.tor[T_SEED] * 7919u + p * 104729u, dens = P.tor[T_DENS];
+    while (k && (thash(seed ^ (k * 2654435761u)) & 127u) > dens) k--;   /* DENSITY: 0 one value, 127 a new one each step */
+    return thash(seed + k * 40503u + 1u) & 255u;
+}
+static const uint8_t TOR0[NTOR] = {0, 0, 40, 100, 20, 0, 0, 0, 0, 0, 0, 64,   0, 0, 64, 16, 64, 1, 1, 0, 0};
+/* the ready-made ones (PRESET 1..): the first 12, then BLEND DEPTH LEN DENS STEP, ANIM (a bit each of the first 12) */
+#define NT_PRE 8u
+static const uint8_t TOR_PRE[NT_PRE][NT_ANIM + 7] = {
+    /* BITS RATE DRV CUT RES NBP FDBK FOLD CLIP SPRD GATE LVL  BLND DPTH LEN DENS STEP  ANIM lo, hi (LVL: about as loud as dry) */
+    {0, 0, 50, 100, 10, 0, 0, 0, 0, 20, 0, 32,     90, 64, 16, 40, 1, 0x00, 0x00},   /* WARM: a little drive */
+    {90, 60, 30, 90, 20, 0, 0, 0, 0, 30, 0, 32,    127, 64, 16, 40, 1, 0x00, 0x00},  /* LO-FI: 8 bit, low rate */
+    {40, 30, 70, 70, 60, 127, 0, 0, 30, 0, 0, 41,  127, 80, 16, 50, 1, 0x28, 0x00},  /* RADIO: a band, it moves */
+    {0, 0, 60, 60, 90, 100, 90, 0, 20, 40, 30, 32, 100, 90, 12, 60, 1, 0x48, 0x00},  /* HOWL: feedback rings */
+    {60, 40, 60, 80, 30, 40, 0, 40, 0, 40, 0, 27,  127, 100, 16, 90, 1, 0x8B, 0x00}, /* GRIT GRID: crush and fold, per 16th */
+    {0, 0, 40, 50, 100, 127, 0, 60, 0, 20, 0, 36,  110, 110, 8, 70, 0, 0x88, 0x00},  /* RUBBER: a resonant band, 32nds */
+    {100, 90, 100, 90, 20, 20, 40, 90, 60, 60, 40, 45, 127, 40, 5, 100, 1, 0xFF, 0x0F}, /* SHRED: all of it, 5 steps */
+    {50, 20, 30, 60, 40, 64, 30, 0, 0, 90, 60, 30, 80, 96, 7, 50, 2, 0x09, 0x06},   /* GHOST: crush, spread, gate */
+};
+static void tor_preset(uint32_t k)              /* PRESET k (1..NT_PRE): the knobs to it (the SEED stays) */
+{
+    const uint8_t *q;
+    uint32_t i;
+    if (!k || k > NT_PRE) return;
+    q = TOR_PRE[k - 1u];
+    for (i = 0; i < NT_ANIM; i++) P.tor[i] = q[i];
+    P.tor[T_BLEND] = q[12]; P.tor[T_DEPTH] = q[13]; P.tor[T_LEN] = q[14]; P.tor[T_DENS] = q[15]; P.tor[T_STEP] = q[16];
+    P.tor[T_ANIM_LO] = q[17]; P.tor[T_ANIM_HI] = q[18];
+}
+
+static void tor_targets(void)                   /* when the step or a knob moved: where each parameter goes */
+{
+    static const uint8_t SH[4] = {7, 8, 9, 10};   /* STEP: 1/32 1/16 1/8 1/4 */
+    uint32_t i, sum = 0, len = P.tor[T_LEN] ? P.tor[T_LEN] : 16u, mask = P.tor[T_ANIM_LO] | (uint32_t)P.tor[T_ANIM_HI] << 8;
+    uint32_t idx = playing ? (pos16_q8() >> SH[P.tor[T_STEP] & 3u]) % len : 0u;
+    int32_t depth = ((int32_t)P.tor[T_DEPTH] - 64) * 2;   /* -128 .. +126: under the knob's value or over it */
+    for (i = 0; i < NTOR; i++) sum = sum * 31u + P.tor[i];
+    if ((uint8_t)sum == T.sum && idx == T.idx && T.on) return;
+    T.sum = (uint8_t)sum; T.idx = idx;
+    for (i = 0; i < NT_ANIM; i++) {
+        int32_t v = P.tor[i];
+        if ((mask >> i & 1u) && depth) v += depth * (int32_t)tanim(i, idx) / 255;
+        T.tgt[i] = (uint8_t)clampi(v, 0, 127);
+    }
+}
+
+static void torsion(int32_t *b, uint32_t n)
+{
+    int32_t blend = (int32_t)P.tor[T_BLEND] * 32767 / 127, e[NT_ANIM], cg, g12, sh, fbg, peak = 0, thr, k15, nbp, drv, fg, sp;
+    int filt;
+    uint32_t i, c, rinc;
+    if (!blend) { T.on = 0; return; }           /* (off: nothing runs) */
+    tor_targets();
+    for (i = 0; i < NT_ANIM; i++) {
+        if (!T.on) T.ev[i] = T.tgt[i] << 8;
+        T.ev[i] += (((int32_t)T.tgt[i] << 8) - T.ev[i]) >> 2;   /* ~3 ms */
+        e[i] = T.ev[i] >> 8;
+    }
+    if (!T.on) { T.fb[0] = T.fb[1] = 0; T.gg = 32767; T.genv = 0; svf_reset(&T.f[0]); svf_reset(&T.f[1]); }
+    T.on = 1;
+    if (e[T_CUT] != T.fcut || e[T_RES] != T.fres) {
+        svf_set(&T.f[0], SVF_G[clampi(e[T_CUT], 0, 124)], (uint32_t)e[T_RES]);
+        svf_set(&T.f[1], SVF_G[clampi(e[T_CUT], 0, 124)], (uint32_t)e[T_RES]);
+        T.fcut = e[T_CUT]; T.fres = e[T_RES];
+    }
+    k15 = T.f[0].k;
+    sh = e[T_BITS] * 14 / 127;                  /* BITS: 16 .. 2 */
+    rinc = 65536u / (1u + (uint32_t)(e[T_RATE] * e[T_RATE]) / 256u);   /* RATE: every frame .. one in 64 */
+    fbg = e[T_FDBK] * 290;                      /* FEEDBACK: up to ~1.1 round the loop (the clipping holds it) */
+    thr = 32767 - e[T_CLIP] * 250;              /* CLIP: down to ~1000, then back up to full */
+    cg = (int32_t)((32767u << 8) / (uint32_t)thr);
+    g12 = e[T_LEVEL] * e[T_LEVEL];              /* LEVEL: 64 is 1x (Q12) */
+    nbp = e[T_NBP] * 258; drv = 256 + e[T_DRIVE] * 48; fg = 256 + e[T_FOLD] * 28; sp = e[T_SPREAD] * 200;
+    filt = e[T_CUT] < 120 || e[T_RES] > 4 || e[T_NBP] || fbg;   /* (a notch at the top, no feedback: nothing to do) */
+    for (i = 0; i < n; i++) {
+        int32_t w[2], dry[2], mid, s;
+        T.hacc += rinc;
+        if (T.hacc >= 65536u) {                 /* RATE: a new sample; BITS: fewer of them */
+            T.hacc -= 65536u;
+            for (c = 0; c < 2u; c++) T.hold[c] = (clip15(b[2u * i + c]) >> sh) << sh;
+        }
+        for (c = 0; c < 2u; c++) {
+            int32_t x = clip15(T.hold[c] + MUL15(T.fb[c], fbg)), v3, v1, v2, bp, notch;
+            svf_t *f = &T.f[c];
+            dry[c] = b[2u * i + c];
+            if (!filt) goto shape;
+            v3 = x - f->ic2;                    /* the filter: band pass (its peak at 1) and notch, crossfaded */
+            v1 = MUL15(f->a1, f->ic1) + MUL15(f->a2, v3);
+            v2 = f->ic2 + MUL15(f->a2, f->ic1) + MUL15(f->a3, v3);
+            f->ic1 = clampi(2 * v1 - f->ic1, -0x3FFFFFFF, 0x3FFFFFFF);
+            f->ic2 = clampi(2 * v2 - f->ic2, -0x3FFFFFFF, 0x3FFFFFFF);
+            bp = MUL15(k15, v1);
+            notch = x - bp;
+            x = notch + MUL15(bp - notch, nbp);
+        shape:
+            x = drive15(x, drv);                /* DRIVE: up to ~25x into the soft clip */
+            if (e[T_FOLD]) x = fold15((x * fg) >> 8);
+            if (e[T_CLIP]) x = (clampi(x, -thr, thr) * cg) >> 8;
+            T.fb[c] = x;
+            w[c] = x;
+        }
+        if (sp) {                               /* SPREAD: the mid, ~7.5 ms late, added to one side, taken from the other */
+            mid = (w[0] + w[1]) >> 1;
+            tsp_buf[T.sw & (TSP_LEN - 1u)] = (int16_t)clip15(mid);
+            s = MUL15(tsp_buf[(T.sw - 331u) & (TSP_LEN - 1u)], sp);
+            T.sw++;
+            w[0] += s; w[1] -= s;
+        }
+        for (c = 0; c < 2u; c++) {
+            int32_t a = w[c] < 0 ? -w[c] : w[c];
+            if (a > peak) peak = a;
+            if (T.gg != 32767) w[c] = MUL15(w[c], T.gg);
+            if (g12 != 4096) w[c] = (int32_t)(((int64_t)w[c] * g12) >> 12);
+            b[2u * i + c] = blend == 32767 ? w[c] : mix15(dry[c], w[c], blend);   /* (full: none of the dry) */
+        }
+        if (e[T_GATE]) T.gg += ((T.genv > e[T_GATE] * 200 ? 32767 : 0) - T.gg) >> 6;   /* GATE: shut under it (~1.5 ms) */
+        else T.gg = 32767;
+    }
+    T.genv = peak > T.genv ? peak : T.genv - (T.genv >> 3);   /* (the gate's level: fast up, ~5 ms down) */
+}
+
 static void fx_render(int32_t *b, uint32_t n)
 {
     int32_t dry[32];                            /* (n is BLK, 32) the mix before the delay, mono: the reverb's SEND */
     uint32_t i;
     pulp(b, n);
     gate(b, n, GM_PRE);
+    torsion(b, n);
     xfx(b, n);
     master_filter(b, n);
     eq(b, n);

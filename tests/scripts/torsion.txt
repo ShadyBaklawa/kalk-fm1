@@ -1,0 +1,37 @@
+# KALK TORSION demo (step 9), 124 BPM: two bars as they are; then TORSION's presets two bars each: WARM, LO-FI, RADIO,
+# GRIT GRID, SHRED, GHOST; then on TOR ANIM the white keys add DRIVE and FOLD to what moves, and a new SEED; off
+100 btn 12
+150 btn 2
+3900 enc 0 -1
+3910 enc 0 -1
+3920 enc 0 -1
+3930 enc 0 -1
+3940 enc 0 -1
+3950 enc 2 1
+4100 shot
+7800 enc 2 1
+8000 shot
+11700 enc 2 1
+11900 shot
+15600 enc 2 2
+15800 shot
+19500 enc 2 2
+19700 shot
+23400 enc 2 1
+23600 shot
+27300 enc 0 1
+27310 enc 0 1
+27320 enc 0 1
+27400 keys 0x10
+27450 keys 0
+27500 keys 0x1000
+27550 keys 0
+27600 enc 5 10
+27800 shot
+31200 enc 0 -1
+31210 enc 0 -1
+31220 enc 0 -1
+31230 enc 4 -50
+31400 shot
+33100 btn 12
+34600 end

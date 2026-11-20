@@ -124,6 +124,11 @@ At GRAIN OFF and SPEED 100 % the sample plays as before. A project saved by 0.2 
 | FOLLOW | BEAT: the beat moves the FILTER's cutoff: over 0 the hits open it, under 0 they close it (0: off) | ATTACK | RELEASE | SOURCE: MIX, KICK, K+SN, DRUMS |
 | PULP | LEVEL (OFF: off) | LO | HI (the pitch it listens for) | DECAY |
 | PULP 2 | WAVE (sine, triangle, square) | TRIG: what strikes it: MIX (its onsets), KICK, K+SN, DRUMS | GLIDE (how fast it follows the pitch) | PAN |
+| TORSION | PRESET: WARM, LO-FI, RADIO, HOWL, GRIT GRID, RUBBER, SHRED, GHOST (sets the knobs; the SEED stays) | DRIVE | BLEND (OFF: off) | LEVEL (64: 1x) |
+| TOR CRUSH | BITS (16 .. 2) | RATE (the sample rate it holds to) | FOLD | CLIP |
+| TOR FILTER | CUTOFF | RES | NOT>BP (from a notch to a band pass) | FDBK (the end back into the filter: it howls) |
+| TOR ANIM | DEPTH (how far ANIM moves them, under or over the knob) | LENGTH (1-64 steps) | DENSTY (how many steps bring a new value) | SEED (which random sequence: the same every time) |
+| TOR MORE | SPREAD (stereo from mono) | GATE (shuts under it) | STEP (1/32 .. 1/4) | |
 
 The delay is a tape-style reson delay: with RESON and TAPE LFO at rest it is the plain delay, and once the filter is in,
 the echoes are soft-limited, so high RES and FDBK ring and sing rather than clip.
@@ -146,6 +151,11 @@ ones, synced to the bar while playing:
 
 PULP is LIME.lite's Automatik Perc: a percussion oscillator struck by the drums that plays at the pitch it hears
 them at (between LO and HI), before the effects.
+
+TORSION is an animated distortion after boscomac's Bit Torsion (Reaktor): its behaviour, our own code. On TOR ANIM the
+white keys 1-12 pick which of BITS, RATE, DRIVE, CUTOFF, RES, NOT>BP, FDBK, FOLD, CLIP, SPREAD, GATE, LEVEL a random step
+sequence moves (orange on the inner ring); it repeats every LENGTH steps, and a SEED always gives the same one, so a
+project sounds the same when loaded again. Projects saved by 0.2 or 0.3 load with TORSION off.
 
 Only the chosen XFX runs; SLICE, FREEZE and PITCH use REPEAT's buffer, so they cost no memory.
 

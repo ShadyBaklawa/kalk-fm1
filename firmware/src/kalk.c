@@ -91,6 +91,7 @@ static void proj_default(project_t *p)
     for (s = 0; s < NXY; s++) p->xy[s][0] = p->xy[s][1] = 255;
     for (a = 0; a < NVOICE; a++) for (l = 0; l < 4u; l++) p->vx[a][l] = VX_DEFAULT[a][l];
     for (l = 0; l < NFX2; l++) p->fx2[l] = FX2_0[l];
+    for (l = 0; l < NTOR; l++) p->tor[l] = TOR0[l];
     p->magic = PROJ_MAGIC;
 }
 
@@ -98,13 +99,13 @@ static struct { uint8_t slot, ch, out, sync; uint32_t magic; } set;
 #define SET_MAGIC 0x4B53u
 
 /* ======================================================================== the parameters on the screen */
-enum { K_VP, K_FX, K_SQ, K_GL, K_SL, K_VX, K_F2 };   /* (K_VX, K_F2: after 0.3: the EXTRA pages, fx2[]) */          /* voice, effects, sequence, global, the selected second-window lane */
+enum { K_VP, K_FX, K_SQ, K_GL, K_SL, K_VX, K_F2, K_TOR };   /* (after 0.3: the EXTRA pages, fx2[]; TORSION) */          /* voice, effects, sequence, global, the selected second-window lane */
 enum { SQ_LEN, SQ_START, SQ_SWING, SQ_HALF, SQ_TLEN, SQ_PLEN, SQ_MLEN, SQ_STRETCH, SQ_CHAIN, SQ_SLOT, SQ_CPAT, SQ_BPM,
        SQ_RMX, SQ_RFREQ, SQ_RSHIFT, SQ_RLANES, SQ_R2DEPTH, SQ_R2RATE, SQ_R2SHAPE, SQ_GMODE, SQ_GRATE, SQ_GDEPTH,
        SQ_GSMOOTH, NSQ };
 enum { GL_BPM, GL_CH, GL_OUT, GL_SYNC };
 enum { SL_LEN, SL_STRETCH };
-enum { F_WAV, F_NUM, F_SEMI, F_MS, F_HZ, F_LIST, F_PAN, F_BIP, F_PLUS1, F_PCT, F_TICKS, F_MASK3, F_CHAIN, F_PAT, F_OMNI, F_LEN, F_RT, F_SPEED, F_GMS, F_OFFN, F_FMS, F_AUTOMS };
+enum { F_WAV, F_NUM, F_SEMI, F_MS, F_HZ, F_LIST, F_PAN, F_BIP, F_PLUS1, F_PCT, F_TICKS, F_MASK3, F_CHAIN, F_PAT, F_OMNI, F_LEN, F_RT, F_SPEED, F_GMS, F_OFFN, F_FMS, F_AUTOMS, F_BITS, F_SRATE };
 typedef struct { uint8_t kind, idx; } pref_t;
 
 static const char *const LANE_LONG[NLANE] = {"KICK", "SNARE", "HAT", "TIE", "POD", "MOD"};
@@ -142,6 +143,11 @@ static const char *const L_R2RATE[] = {"1/4 BAR", "1/2 BAR", "1 BAR", "2 BAR", "
 static const char *const L_R2SHAPE[NR2] = {"SINE", "TRI", "SAW UP", "SAW DN", "SQUARE", "RANDOM", "DRUNK"};
 static const char *const L_GMODE[] = {"OFF", "PRE FX", "POST FX"};
 static const char *const L_HATMODE[] = {"NOISE", "808"};
+static const char *const L_TPRE[] = {"CUSTOM", "WARM", "LO-FI", "RADIO", "HOWL", "GRIT GRID", "RUBBER", "SHRED", "GHOST"};
+static const char *const L_TSTEP[] = {"1/32", "1/16", "1/8", "1/4"};
+static const char *const TOR_NAMES[NTOR] = {"BITS", "RATE", "DRIVE", "CUTOFF", "RES", "NOT>BP", "FDBK", "FOLD", "CLIP",
+                                            "SPREAD", "GATE", "LEVEL", "PRESET", "BLEND", "DEPTH", "LENGTH", "DENSTY",
+                                            "SEED", "STEP", "", "", "", "", ""};
 static const char *const L_BSRC[] = {"MIX", "KICK", "K+SN", "DRUMS"};
 static const char *const F2_NAMES[NFX2] = {"BEAT", "ATTACK", "RELEAS", "SOURCE", "LEVEL", "LO", "HI", "DECAY",
                                            "WAVE", "TRIG", "GLIDE", "PAN", "", "", "", ""};
@@ -171,7 +177,7 @@ static const char *const VX_NAMES[NVOICE][4] = {
     {"FM ATK", "FM DEC", "DROP", "NOISFM"}, {"", "", "", ""}};
 static const pref_t PG_LANE[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_SQ, SQ_SWING}, {K_SQ, SQ_LEN}};
 static const pref_t PG_MODL[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_FX, FX_MODFX}, {K_FX, FX_FMOD}};
-#define NPG_FX 13u                              /* the FX pages (XFX is the first) */
+#define NPG_FX 18u                              /* the FX pages (XFX is the first) */
 static const pref_t PG_FX[NPG_FX][4] = {
     {{K_FX, FX_XTYPE}, {K_FX, FX_X}, {K_FX, FX_Y}, {K_FX, FX_XAUTO}},
     {{K_FX, FX_DL}, {K_FX, FX_DR}, {K_FX, FX_DFB}, {K_FX, FX_DSEND}},
@@ -186,9 +192,16 @@ static const pref_t PG_FX[NPG_FX][4] = {
     {{K_F2, F2_BEAT}, {K_F2, F2_BATK}, {K_F2, F2_BREL}, {K_F2, F2_BSRC}},   /* (after 0.3) */
     {{K_F2, F2_PLVL}, {K_F2, F2_PLO}, {K_F2, F2_PHI}, {K_F2, F2_PDEC}},
     {{K_F2, F2_PWAVE}, {K_F2, F2_PTRIG}, {K_F2, F2_PGLIDE}, {K_F2, F2_PPAN}},
+    {{K_TOR, T_PRESET}, {K_TOR, T_DRIVE}, {K_TOR, T_BLEND}, {K_TOR, T_LEVEL}},   /* (after the 0.3 release) */
+    {{K_TOR, T_BITS}, {K_TOR, T_RATE}, {K_TOR, T_FOLD}, {K_TOR, T_CLIP}},
+    {{K_TOR, T_CUT}, {K_TOR, T_RES}, {K_TOR, T_NBP}, {K_TOR, T_FDBK}},
+    {{K_TOR, T_DEPTH}, {K_TOR, T_LEN}, {K_TOR, T_DENS}, {K_TOR, T_SEED}},
+    {{K_TOR, T_SPREAD}, {K_TOR, T_GATE}, {K_TOR, T_STEP}, {K_TOR, NTOR}},
 };
 static const char *const PG_FX_T[NPG_FX] = {"XFX", "DELAY", "DELAY 2", "RESON", "TAPE LFO", "FILTER", "EQ", "OUT", "REVERB",
-                                         "REVERB 2", "FOLLOW", "PULP", "PULP 2"};
+                                         "REVERB 2", "FOLLOW", "PULP", "PULP 2",
+                                         "TORSION", "TOR CRUSH", "TOR FILTER", "TOR ANIM", "TOR MORE"};
+#define PG_TOR_ANIM 16u                         /* TOR ANIM: the white keys pick what ANIM moves */
 static const pref_t PG_SEQ[3][4] = {
     {{K_SQ, SQ_LEN}, {K_SQ, SQ_START}, {K_SQ, SQ_SWING}, {K_SQ, SQ_HALF}},
     {{K_SQ, SQ_TLEN}, {K_SQ, SQ_PLEN}, {K_SQ, SQ_MLEN}, {K_SQ, SQ_STRETCH}},
@@ -351,6 +364,21 @@ static pval_t pval(pref_t r)
         case F2_PPAN: v.fmt = F_PAN; break;
         }
         break;
+    case K_TOR:
+        if (r.idx >= NTOR || !TOR_NAMES[r.idx][0]) break;   /* (an empty corner) */
+        v.p = &P.tor[r.idx];
+        v.name = TOR_NAMES[r.idx];
+        switch (r.idx) {
+        case T_PRESET: v.max = 8; v.fmt = F_LIST; v.list = L_TPRE; break;
+        case T_BITS: v.fmt = F_BITS; break;
+        case T_RATE: v.fmt = F_SRATE; break;
+        case T_CUT: v.max = 124; v.fmt = F_HZ; break;
+        case T_DEPTH: v.fmt = F_BIP; break;
+        case T_LEN: v.min = 1; v.max = 64; break;
+        case T_STEP: v.max = 3; v.fmt = F_LIST; v.list = L_TSTEP; break;
+        case T_BLEND: case T_GATE: case T_FDBK: case T_FOLD: case T_CLIP: case T_SPREAD: v.fmt = F_OFFN; break;
+        }
+        break;
     case K_SL:
         if (r.idx == SL_LEN) { v.p = &P.slen[sec]; v.min = 1; v.max = 16; v.name = "LEN"; }
         else { v.p = &P.stretch; v.max = 1; v.fmt = F_LIST; v.list = L_OFFON; v.name = "STRTCH"; v.bit = (uint8_t)(1u << sec); }
@@ -427,6 +455,13 @@ static void fmt_val(const pval_t *v, char *d)
     case F_SPEED: d = put_u(d, (uint32_t)x * 100u / 64u); put_s(d, "%"); break;   /* 64: 100 % */
     case F_GMS: d = put_u(d, (220u + (uint32_t)x * 28u) / 44u); put_s(d, "ms"); break;
     case F_FMS: d = put_u(d, follow_ms(x)); put_s(d, "ms"); break;   /* FOLLOW's attack / release */
+    case F_BITS: d = put_u(d, 16u - (uint32_t)x * 14u / 127u); put_s(d, " BIT"); break;
+    case F_SRATE: {                             /* TORSION's RATE: the sample rate it holds to */
+        uint32_t hz = 44100u / (1u + (uint32_t)(x * x) / 256u);
+        if (hz >= 1000u) { d = put_u(d, hz / 1000u); *d++ = '.'; d = put_u(d, hz / 100u % 10u); put_s(d, "k"); }
+        else put_u(d, hz);
+        break;
+    }
     case F_AUTOMS:                              /* 0: as the voice's DECAY has it */
         if (!x) { put_s(d, "AUTO"); break; }
         { uint32_t ms = DECAY_MS[x & 127];
@@ -448,6 +483,8 @@ static void say(const char *s) { put_s(msg, s); msg_until = fm1_ms + 1400u; }
 
 static uint8_t *lane_step(uint32_t l, uint32_t s) { return l < NMAIN ? &P.main[edit_pat][l][s] : &P.sec[l - NMAIN][s]; }
 static int gate_edit(void) { return section == SEC_RMX && page[SEC_RMX] % 3u == 2u; }
+static int anim_edit(void) { return section == SEC_FX && page[SEC_FX] % NPG_FX == PG_TOR_ANIM; }   /* TOR ANIM */
+static uint32_t anim_mask(void) { return P.tor[T_ANIM_LO] | (uint32_t)P.tor[T_ANIM_HI] << 8; }
 static uint32_t gate_pos(void)                  /* the GATE's step now (as kalk_fx.c's gate() finds it) */
 {
     static const uint8_t SH[3] = {9, 8, 7};
@@ -512,6 +549,15 @@ static void draw_screen(void)
         uint16_t base = muted ? RGB(110, 110, 110) : LANE_COL[l];
         ring_len[l] = l < NMAIN ? 16u : (P.slen[l - NMAIN] ? P.slen[l - NMAIN] : 16u);
         if (playing) ph = l < NMAIN ? play_main : ui_spos[l - NMAIN];
+        if (l == L_MOD && anim_edit()) {        /* TOR ANIM: the inner ring is what ANIM moves (12: orange is on) */
+            uint32_t m = anim_mask();
+            ring_len[l] = NT_ANIM;
+            for (s = 0; s < NT_ANIM; s++) {
+                cell[l][s] = swap16((m >> s & 1u) ? RGB(255, 140, 30) : RGB(50, 30, 12));
+                flag[l][s] = 0;
+            }
+            continue;
+        }
         if (l == L_MOD && gate_edit()) {        /* the GATE page: the inner ring is the gate (red: a cut) */
             ring_len[l] = 16u;
             ph = playing ? gate_pos() : 99u;
@@ -666,6 +712,7 @@ static uint32_t grid_sig(void)
     for (i = 0; i < NSEC; i++) h = h * 31u + P.slen[i];
     if (playing) { h = h * 31u + ui_pos + cur_pat * 64u; for (i = 0; i < NSEC; i++) h = h * 31u + ui_spos[i]; }
     if (gate_edit()) { h = h * 31u + 77u + (playing ? gate_pos() : 99u); for (i = 0; i < NSTEP; i++) h = h * 31u + P.gate[i]; }
+    if (anim_edit()) h = h * 31u + 91u + anim_mask();
     return h;
 }
 static uint32_t head_sig(void)
@@ -699,6 +746,18 @@ static void step_down(uint32_t s)
     uint8_t *st = lane_step(sel_lane, s);
     int8_t k = step_key(s);
     if (gate_edit()) { P.gate[s] ^= ST_ON; key_long[k] = 1; key_off[k] = 0; proj_dirty = 1; return; }   /* a cut on / off */
+    if (anim_edit()) {                          /* TOR ANIM: steps 1..12 are TORSION's first 12 knobs: moved by ANIM or not */
+        key_long[k] = 1; key_off[k] = 0;
+        if (s < NT_ANIM) {
+            char m[24];
+            uint32_t a = anim_mask() ^ (1u << s);
+            P.tor[T_ANIM_LO] = (uint8_t)a; P.tor[T_ANIM_HI] = (uint8_t)(a >> 8);
+            put_s(put_s(put_s(m, TOR_NAMES[s]), " "), a >> s & 1u ? "MOVES" : "STAYS");
+            say(m);
+            proj_dirty = 1;
+        }
+        return;
+    }
     if (fm1_in.buttons & (1u << BTN_SEL) && sel_lane == L_HAT) {   /* SEL + a hat step: open / closed */
         *st = (uint8_t)((*st | ST_ON) ^ ST_OPEN);
         key_long[k] = 1;
@@ -719,7 +778,7 @@ static void step_hold(uint32_t s)
 {
     int8_t k = step_key(s);
     uint8_t *st = lane_step(sel_lane, s);
-    if (key_long[k] || fm1_ms - key_t0[k] < 350u || sel_lane == L_MOD || gate_edit()) return;
+    if (key_long[k] || fm1_ms - key_t0[k] < 350u || sel_lane == L_MOD || gate_edit() || anim_edit()) return;
     key_long[k] = 1;
     key_off[k] = 0;
     *st = (uint8_t)((*st | ST_ON) ^ ST_ACC);    /* held: the accent */
@@ -729,7 +788,7 @@ static void step_up(uint32_t s)
 {
     int8_t k = step_key(s);
     uint8_t *st = lane_step(sel_lane, s);
-    if (gate_edit()) { key_off[k] = 0; return; }
+    if (gate_edit() || anim_edit()) { key_off[k] = 0; return; }
     if (key_off[k]) *st = 0;
     key_off[k] = 0;
     if (held_step == (int8_t)s) held_step = -1;
@@ -802,10 +861,15 @@ static int proj_load(uint32_t slot)
 {
     static project_t t;
     static project02_t o;
-    static project03_t o3;
+    static union { project03_t r3; project_s4_t s4; } o3;
     if (!blob_load(slot, &t, sizeof t) && t.magic == PROJ_MAGIC) { P = t; return 0; }
-    /* a 0.3 project: the same up to the EXTRA pages and fx2[], which get their defaults */
-    if (!blob_load(slot, &o3, sizeof o3) && o3.magic == PROJ_MAGIC) { proj_default(&t); proj_upgrade03(&t, &o3); P = t; return 0; }
+    /* the 0.3 release (no TORSION), step 4's build (no EXTRA pages, fx2[] either): what's missing gets its defaults */
+    if (!blob_load(slot, &o3.r3, sizeof o3.r3) && o3.r3.magic == PROJ_MAGIC) {
+        proj_default(&t); proj_upgrade_head(&t, o3.r3.head, sizeof o3.r3.head, o3.r3.magic); P = t; return 0;
+    }
+    if (!blob_load(slot, &o3.s4, sizeof o3.s4) && o3.s4.magic == PROJ_MAGIC) {
+        proj_default(&t); proj_upgrade_head(&t, o3.s4.head, sizeof o3.s4.head, o3.s4.magic); P = t; return 0;
+    }
     /* a 0.2 project: the same up to the effects, which were fewer; the new ones get their defaults */
     if (blob_load(slot, &o, sizeof o) || o.magic != PROJ_MAGIC) return -1;
     proj_default(&t);
@@ -847,6 +911,7 @@ static void encoders(void)
             if (!v.p) continue;
             if ((e > 1 || e < -1) && v.max - v.min > 40) e *= 3;   /* fast: bigger steps */
             pset(&v, pget(&v) + e);
+            if (v.p == &P.tor[T_PRESET]) tor_preset(P.tor[T_PRESET]);   /* TORSION's PRESET: its knobs to it */
             proj_dirty = 1;
         }
     }
@@ -985,7 +1050,8 @@ static void app_main(void)
             for (k = 0; k < NKEY; k++) {
                 int8_t s = KEY_STEP[k];
                 int on = 0, glow = 0;
-                if (s >= 0 && gate_edit()) {
+                if (s >= 0 && anim_edit()) on = s < (int)NT_ANIM && (anim_mask() >> s & 1u);
+                else if (s >= 0 && gate_edit()) {
                     on = (P.gate[s] & ST_ON) != 0u;
                     if (playing && (uint32_t)s == gate_pos()) on = !on;
                 } else if (s >= 0) {

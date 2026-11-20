@@ -39,6 +39,7 @@ static void fx_neutral(void)                    /* everything off but the reverb
                                    64, 12, 0, 0,  70, 90, 60, 0,  0, 0, 127, 0,  114, 0, 0, 0,  4, 0, 0, 0};
     memcpy(P.fx, F, sizeof F);
     memcpy(P.fx2, FX2_0, sizeof FX2_0);         /* (after 0.3: at rest) */
+    memcpy(P.tor, TOR0, sizeof TOR0);
 }
 
 /* run `secs` of audio; the input is an impulse (kind 0) or 50 ms of noise (kind 1) at the start; returns the
@@ -363,23 +364,154 @@ int main(void)
         check(same && pulp_hits == 0, "PULP LEVEL 0: adds nothing (and forgets the hits)");
     }
 
-    /* a 0.3 project (step 4's layout): everything it had is kept; the EXTRA pages and fx2[] keep their defaults */
+    /* the 0.3 release's projects (no TORSION) and step 4's (no EXTRA pages, fx2[] either): what they had is kept,
+     * the rest keeps its defaults; every layout has its own size (the store tells them apart) */
     {
         static project03_t o;
+        static project_s4_t o4;
         static project_t t3;
         int same = 1;
-        check(sizeof(project03_t) != sizeof(project_t) && sizeof(project03_t) != sizeof(project02_t),
-              "0.2, 0.3 and new projects differ in size (the store tells them apart)");
+        check(sizeof(project03_t) != sizeof(project_t) && sizeof(project_s4_t) != sizeof(project03_t) &&
+              sizeof(project_s4_t) != sizeof(project02_t) && sizeof(project03_t) != sizeof(project02_t),
+              "0.2, step 4's, 0.3's and new projects differ in size (the store tells them apart)");
         for (i = 0; i < sizeof o; i++) ((uint8_t *)&o)[i] = (uint8_t)(i * 5u + 3u);
         o.magic = PROJ_MAGIC;
         memset(&t3, 0xAA, sizeof t3);
-        proj_upgrade03(&t3, &o);
+        proj_upgrade_head(&t3, o.head, sizeof o.head, o.magic);
         if (memcmp(&t3, o.head, sizeof o.head)) same = 0;
+        for (i = 0; i < NTOR; i++) if (t3.tor[i] != 0xAA) same = 0;
+        check(same && t3.magic == PROJ_MAGIC, "0.3 release project: all of it kept (GRAIN, FOLLOW, PULP too); TORSION from defaults");
+        same = 1;
+        for (i = 0; i < sizeof o4; i++) ((uint8_t *)&o4)[i] = (uint8_t)(i * 3u + 7u);
+        o4.magic = PROJ_MAGIC;
+        memset(&t3, 0xAA, sizeof t3);
+        proj_upgrade_head(&t3, o4.head, sizeof o4.head, o4.magic);
+        if (memcmp(&t3, o4.head, sizeof o4.head)) same = 0;
         for (i = 0; i < sizeof t3.vx; i++) if (((uint8_t *)t3.vx)[i] != 0xAA) same = 0;
         for (i = 0; i < NFX2; i++) if (t3.fx2[i] != 0xAA) same = 0;
-        check(same && t3.magic == PROJ_MAGIC, "0.3 project upgrade: all of it kept; GRAIN, FOLLOW, PULP from defaults");
-        check(VX_DEFAULT[0][VX_GRAIN] == 0 && VX_DEFAULT[0][VX_SPEED] == 64 && VX_DEFAULT[1][VX_SPEED] == 64,
-              "GRAIN / SPEED at rest by default (0.3 projects sound the same)");
+        check(same && t3.magic == PROJ_MAGIC, "step 4's project: all of it kept; GRAIN, FOLLOW, PULP, TORSION from defaults");
+        check(VX_DEFAULT[0][VX_GRAIN] == 0 && VX_DEFAULT[0][VX_SPEED] == 64 && VX_DEFAULT[1][VX_SPEED] == 64 && TOR0[T_BLEND] == 0,
+              "GRAIN / SPEED and TORSION at rest by default (older projects sound the same)");
+    }
+
+    /* TORSION (after the 0.3 release): BLEND 0 leaves the sound alone; every preset with every SEED stays bounded; BITS
+     * leaves few levels, RATE holds samples; ANIM moves only what it's told, repeats every LENGTH, the same for a SEED
+     * and not for another; DENSITY 0 holds one value; the GATE shuts on quiet; SPREAD makes mono stereo, mono-safe */
+    {
+        static int32_t b[2 * B], in[2 * B];
+        uint32_t f, pr, sd, same = 1, bounded = 1;
+        double worst = 0;
+        memcpy(P.vp, VP_DEFAULT, sizeof VP_DEFAULT); memcpy(P.vx, VX_DEFAULT, sizeof VX_DEFAULT);
+        fx_reset(); fx_neutral(); memcpy(P.tor, TOR0, sizeof TOR0); T.on = 0;
+        playing = 1;
+        for (f = 0; f < FS / 4; f += B) {
+            gl_pos(f);
+            for (i = 0; i < 2 * B; i++) in[i] = b[i] = noise15();
+            torsion(b, B);
+            if (memcmp(b, in, sizeof b)) same = 0;
+        }
+        check(same && !T.on, "TORSION BLEND 0: the sound as it was, nothing runs");
+        for (pr = 1; pr <= NT_PRE; pr++)
+            for (sd = 0; sd < 3u; sd++) {
+                double pk = 0;
+                memcpy(P.tor, TOR0, sizeof TOR0); P.tor[T_SEED] = (uint8_t)(sd * 50u); tor_preset(pr); T.on = 0;
+                memset(V, 0, sizeof V);
+                for (f = 0; f < 2u * FS; f += B) {
+                    gl_pos(f);
+                    if (f % 5512u < B) voice_trigger(f % 11024u < B ? V_KICK : V_SNARE, 1, 0, 32767);
+                    memset(b, 0, sizeof b);
+                    voices_render(b, B);
+                    torsion(b, B);
+                    for (i = 0; i < 2 * B; i++) { double a = fabs(b[i] / 32768.0); if (a > pk) pk = a; }
+                }
+                if (pk > 3.0) { bounded = 0; printf("     PRESET %u SEED %u: %.2f\n", pr, sd * 50u, pk); }
+                if (pk > worst) worst = pk;
+            }
+        printf("     TORSION: the loudest of 8 presets x 3 seeds on kick and snare: %.2f of full scale (the out stage limits)\n", worst);
+        check(bounded && worst > 0.05, "TORSION: every preset with every seed sounds and stays bounded");
+        /* BITS 127 (2 bit): few levels; RATE 127: a sample held for 64 frames */
+        {
+            int levels[64] = {0}, nl = 0, held = 0;
+            memcpy(P.tor, TOR0, sizeof TOR0); P.tor[T_BLEND] = 127; P.tor[T_BITS] = 127; P.tor[T_DRIVE] = 0;
+            P.tor[T_CUT] = 124; P.tor[T_NBP] = 0; P.tor[T_RES] = 0; T.on = 0;
+            for (f = 0; f < FS / 10; f += B) {
+                for (i = 0; i < 2 * B; i++) b[i] = noise15() * 2;
+                torsion(b, B);
+                for (i = 0; i < 2 * B; i += 2) {
+                    int q = (int)(T.hold[0] >> 14) + 2;
+                    if (q >= 0 && q < 64 && !levels[q]) { levels[q] = 1; nl++; }
+                }
+            }
+            P.tor[T_BITS] = 0; P.tor[T_RATE] = 127; T.on = 0;
+            for (f = 0; f < 64u * 10u; f += B) {
+                int32_t prev = T.hold[0];
+                for (i = 0; i < 2 * B; i++) b[i] = noise15() * 2;
+                torsion(b, B);
+                if (T.hold[0] == prev) held++;
+            }
+            printf("     TORSION: 2 bit: %d levels; RATE 127: a new sample in %d of 20 blocks of 32\n", nl, 20 - held);
+            check(nl <= 4, "TORSION BITS: 2 bits leave 4 levels");
+            check(held == 10, "TORSION RATE 127: a new sample every 64 frames (689 Hz)");
+        }
+        /* ANIM: CUT moves by step, repeats every LENGTH, the same for a SEED; RES (not picked) stays; DENSITY 0 holds */
+        {
+            uint8_t seqA[32], seqB[32], seqC[32], res_moved = 0, dens0 = 1;
+            uint32_t m, k2;
+            for (m = 0; m < 4u; m++) {
+                memcpy(P.tor, TOR0, sizeof TOR0); P.tor[T_BLEND] = 127; P.tor[T_LEN] = 5; P.tor[T_DEPTH] = 127; P.tor[T_DENS] = 127;
+                P.tor[T_ANIM_LO] = 1u << T_CUT; P.tor[T_SEED] = m == 1u ? 77 : 3; P.tor[T_STEP] = 1; P.tor[T_CUT] = 40;
+                if (m == 3u) P.tor[T_DENS] = 0;
+                T.on = 0;
+                for (k2 = 0; k2 < 32u; k2++) {
+                    gl_pos(k2 * 5512u + 100u);
+                    memset(b, 0, sizeof b);
+                    torsion(b, B);
+                    if (m == 0u) seqA[k2] = T.tgt[T_CUT];
+                    else if (m == 1u) seqB[k2] = T.tgt[T_CUT];
+                    else if (m == 2u) seqC[k2] = T.tgt[T_CUT];
+                    else if (T.tgt[T_CUT] != T.tgt[T_CUT] || (k2 && T.tgt[T_CUT] != seqC[0] && 0)) dens0 = 0;
+                    if (T.tgt[T_RES] != P.tor[T_RES]) res_moved = 1;
+                    if (m == 3u && k2 && T.tgt[T_CUT] != seqA[31]) { }
+                }
+                if (m == 3u) { uint8_t first = 0; for (k2 = 0; k2 < 32u; k2++) { gl_pos(k2 * 5512u + 100u); memset(b, 0, sizeof b); torsion(b, B); if (!k2) first = T.tgt[T_CUT]; else if (T.tgt[T_CUT] != first) dens0 = 0; } }
+            }
+            {
+                int moves = 0, period = 1, again = !memcmp(seqA, seqC, sizeof seqA), other = memcmp(seqA, seqB, sizeof seqA) != 0;
+                for (k2 = 1; k2 < 5u; k2++) if (seqA[k2] != seqA[0]) moves = 1;
+                for (k2 = 0; k2 + 5u < 32u; k2++) if (seqA[k2] != seqA[k2 + 5u]) period = 0;
+                printf("     TORSION ANIM on CUTOFF (40, DEPTH +63, LENGTH 5): %u %u %u %u %u %u %u ...\n", seqA[0], seqA[1], seqA[2], seqA[3], seqA[4], seqA[5], seqA[6]);
+                check(moves && period, "TORSION ANIM: CUTOFF moves step by step and repeats every LENGTH (5)");
+                check(again && other, "TORSION ANIM: the same SEED gives the same moves, another SEED others");
+                check(!res_moved, "TORSION ANIM: what isn't picked (RES) stays where its knob is");
+                check(dens0, "TORSION ANIM DENSITY 0: one value held through the loop");
+            }
+        }
+        /* GATE 127 shuts quiet sound; SPREAD makes mono stereo, and L + R is still the mono (twice) */
+        {
+            double out_q = 0, side = 0, sum_err = 0, mid = 0;
+            memcpy(P.tor, TOR0, sizeof TOR0); P.tor[T_BLEND] = 127; P.tor[T_DRIVE] = 0; P.tor[T_GATE] = 127; T.on = 0;
+            for (f = 0; f < FS / 2; f += B) {
+                for (i = 0; i < 2 * B; i++) b[i] = noise15() / 8;   /* quiet */
+                torsion(b, B);
+                if (f > FS / 10) for (i = 0; i < 2 * B; i++) out_q += fabs(b[i]);
+            }
+            memcpy(P.tor, TOR0, sizeof TOR0); P.tor[T_BLEND] = 127; P.tor[T_SPREAD] = 127; T.on = 0;
+            for (f = 0; f < FS / 2; f += B) {
+                double s0[B];
+                for (i = 0; i < B; i++) b[2 * i] = b[2 * i + 1] = noise15();
+                torsion(b, B);
+                (void)s0;
+                if (f > FS / 10) for (i = 0; i < B; i++) {
+                    double l = b[2 * i], r = b[2 * i + 1];
+                    side += (l - r) * (l - r); mid += (l + r) * (l + r);
+                }
+            }
+            (void)sum_err;
+            printf("     TORSION: GATE 127 on quiet noise lets through %.0f; SPREAD 127 side / mid %.2f\n", out_q, sqrt(side / mid));
+            check(out_q == 0, "TORSION GATE: shut under its threshold");
+            check(sqrt(side / mid) > 0.3, "TORSION SPREAD: stereo from mono");
+        }
+        playing = 0;
     }
 
     if (w) {                                    /* the WAV header */
