@@ -38,6 +38,7 @@ static void fx_neutral(void)                    /* everything off but the reverb
     static const uint8_t F[NFX] = {XF_THRU, 64, 32, 0,  3, 4, 0, 0,  0, 0, 127, 0,  127, 0, 64, 0,  64, 64, 64, 0,
                                    64, 12, 0, 0,  70, 90, 60, 0,  0, 0, 127, 0,  114, 0, 0, 0,  4, 0, 0, 0};
     memcpy(P.fx, F, sizeof F);
+    memcpy(P.fx2, FX2_0, sizeof FX2_0);         /* (after 0.3: at rest) */
 }
 
 /* run `secs` of audio; the input is an impulse (kind 0) or 50 ms of noise (kind 1) at the start; returns the
@@ -282,6 +283,36 @@ int main(void)
         for (i = 0; i < NSTEP; i++) if (t2.gate[i] != 0xAA) same = 0;   /* the GATE and the RMX LFO: defaults too */
         if (t2.gmode != 0xAA || t2.r2depth != 0xAA || t2.r2shape != 0xAA) same = 0;
         check(same && t2.magic == PROJ_MAGIC, "0.2 project upgrade: its steps, sounds, effects and motion kept; reverb from defaults");
+    }
+
+    /* FOLLOW (after 0.3): the kick's hits open the low pass (BEAT over 64) or close it (under), then it settles back;
+     * MIX listens to the sound; 64: nothing moves */
+    {
+        static int32_t b[2 * B];
+        uint32_t m, f;
+        static const uint8_t BEAT[4] = {127, 0, 64, 127}, SRC[4] = {BS_KICK, BS_KICK, BS_KICK, BS_MIX};
+        int32_t hi[4], lo[4], settled[4];
+        memcpy(P.vp, VP_DEFAULT, sizeof VP_DEFAULT); memcpy(P.vx, VX_DEFAULT, sizeof VX_DEFAULT);
+        for (m = 0; m < 4u; m++) {
+            fx_reset(); fx_neutral(); memset(V, 0, sizeof V);
+            P.fx[FX_FCUT] = 64; P.fx2[F2_BEAT] = BEAT[m]; P.fx2[F2_BSRC] = SRC[m];
+            hi[m] = 0; lo[m] = 127;
+            for (f = 0; f < 2u * FS; f += B) {
+                if (f % (FS / 2) == 0 && f < FS) voice_trigger(V_KICK, 1, 0, 32767);   /* two kicks, then quiet */
+                memset(b, 0, sizeof b);
+                voices_render(b, B);
+                fx_render(b, B);
+                if (f < FS) { if (X.mcut > hi[m]) hi[m] = X.mcut; if (X.mcut < lo[m]) lo[m] = X.mcut; }
+            }
+            settled[m] = X.mcut;
+        }
+        printf("     FOLLOW: the cutoff (64 at rest) on the kicks: opens to %d, closes to %d, at 64 %d..%d, MIX opens to %d; after: %d %d %d\n",
+               hi[0], lo[1], lo[2], hi[2], hi[3], settled[0], settled[1], settled[3]);
+        check(hi[0] == 126, "FOLLOW BEAT +63 (kick): the hits open the low pass (wide, still running)");
+        check(lo[1] <= 30, "FOLLOW BEAT -64 (kick): the hits close it");
+        check(lo[2] == 64 && hi[2] == 64, "FOLLOW BEAT 0 (64): the cutoff stays where it is");
+        check(hi[3] >= 120, "FOLLOW MIX: the sound itself opens it");
+        check(settled[0] == 64 && settled[1] == 64 && settled[3] == 64, "FOLLOW: it settles back exactly once the hits are gone");
     }
 
     /* a 0.3 project (step 4's layout): everything it had is kept; the EXTRA pages and fx2[] keep their defaults */

@@ -119,6 +119,7 @@ At GRAIN OFF and SPEED 100 % the sample plays as before. A project saved by 0.2 
 | OUT | GAIN | PITCH (+-12, all voices) | DIRT | NORM (the maximiser) |
 | REVERB | TIME (RT60 0.12-21.6 s) | SIZE | DAMP (the highs die first) | SEND (from the mix) |
 | REVERB 2 | LOW (cuts the lows going in: keeps the kick dry) | MOD (wobble, for a metallic shimmer) | WIDTH (0: mono) | DLY>RV (the echoes into the reverb) |
+| FOLLOW | BEAT: the beat moves the FILTER's cutoff: over 0 the hits open it, under 0 they close it (0: off) | ATTACK | RELEASE | SOURCE: MIX, KICK, K+SN, DRUMS |
 
 The delay is a tape-style reson delay: with RESON and TAPE LFO at rest it is the plain delay, and once the filter is in,
 the echoes are soft-limited, so high RES and FDBK ring and sing rather than clip.

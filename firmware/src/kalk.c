@@ -47,8 +47,6 @@ __attribute__((noinline)) static void app_audio(int32_t *out, uint32_t n)
 }
 
 /* ======================================================================== the project */
-/* (after 0.3) fx2[]: everything at rest (0.2 and 0.3 projects sound the same); VX_DEFAULT: kalk_voice.c */
-static const uint8_t FX2_0[NFX2] = {64, 10, 50, BS_KICK,   0, 20, 90, 50,   0, BS_KS, 80, 64};
 static void proj_default(project_t *p)
 {
     static const uint8_t FX0[NFX] = {
@@ -106,7 +104,7 @@ enum { SQ_LEN, SQ_START, SQ_SWING, SQ_HALF, SQ_TLEN, SQ_PLEN, SQ_MLEN, SQ_STRETC
        SQ_GSMOOTH, NSQ };
 enum { GL_BPM, GL_CH, GL_OUT, GL_SYNC };
 enum { SL_LEN, SL_STRETCH };
-enum { F_WAV, F_NUM, F_SEMI, F_MS, F_HZ, F_LIST, F_PAN, F_BIP, F_PLUS1, F_PCT, F_TICKS, F_MASK3, F_CHAIN, F_PAT, F_OMNI, F_LEN, F_RT, F_SPEED, F_GMS, F_OFFN };
+enum { F_WAV, F_NUM, F_SEMI, F_MS, F_HZ, F_LIST, F_PAN, F_BIP, F_PLUS1, F_PCT, F_TICKS, F_MASK3, F_CHAIN, F_PAT, F_OMNI, F_LEN, F_RT, F_SPEED, F_GMS, F_OFFN, F_FMS };
 typedef struct { uint8_t kind, idx; } pref_t;
 
 static const char *const LANE_LONG[NLANE] = {"KICK", "SNARE", "HAT", "TIE", "POD", "MOD"};
@@ -143,6 +141,9 @@ static const char *const L_OFFON[] = {"OFF", "ON"};
 static const char *const L_R2RATE[] = {"1/4 BAR", "1/2 BAR", "1 BAR", "2 BAR", "4 BAR", "8 BAR"};
 static const char *const L_R2SHAPE[NR2] = {"SINE", "TRI", "SAW UP", "SAW DN", "SQUARE", "RANDOM", "DRUNK"};
 static const char *const L_GMODE[] = {"OFF", "PRE FX", "POST FX"};
+static const char *const L_BSRC[] = {"MIX", "KICK", "K+SN", "DRUMS"};
+static const char *const F2_NAMES[NFX2] = {"BEAT", "ATTACK", "RELEAS", "SOURCE", "LEVEL", "LO", "HI", "DECAY",
+                                           "WAVE", "TRIG", "GLIDE", "PAN", "", "", "", ""};
 static const char *const L_GRATE[] = {"1/8", "1/16", "1/32"};
 static const char *const L_DLFO[] = {"1/16", "1/8", "1/4", "1/2", "1 BAR", "2 BAR", "4 BAR"};
 static const char *const L_EVERY[] = {"OFF", "8 BAR", "4 BAR", "2 BAR", "1 BAR"};
@@ -169,7 +170,7 @@ static const char *const VX_NAMES[NVOICE][4] = {
     {"FM ATK", "FM DEC", "DROP", "NOISFM"}, {"", "", "", ""}};
 static const pref_t PG_LANE[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_SQ, SQ_SWING}, {K_SQ, SQ_LEN}};
 static const pref_t PG_MODL[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_FX, FX_MODFX}, {K_FX, FX_FMOD}};
-#define NPG_FX 10u                              /* the FX pages (XFX is the first) */
+#define NPG_FX 11u                              /* the FX pages (XFX is the first) */
 static const pref_t PG_FX[NPG_FX][4] = {
     {{K_FX, FX_XTYPE}, {K_FX, FX_X}, {K_FX, FX_Y}, {K_FX, FX_XAUTO}},
     {{K_FX, FX_DL}, {K_FX, FX_DR}, {K_FX, FX_DFB}, {K_FX, FX_DSEND}},
@@ -181,9 +182,10 @@ static const pref_t PG_FX[NPG_FX][4] = {
     {{K_FX, FX_GAIN}, {K_FX, FX_PITCH}, {K_FX, FX_DIRT}, {K_FX, FX_NORM}},
     {{K_FX, FX_RTIME}, {K_FX, FX_RSIZE}, {K_FX, FX_RDAMP}, {K_FX, FX_RSEND}},
     {{K_FX, FX_RLOW}, {K_FX, FX_RMOD}, {K_FX, FX_RWIDTH}, {K_FX, FX_RDLY}},
+    {{K_F2, F2_BEAT}, {K_F2, F2_BATK}, {K_F2, F2_BREL}, {K_F2, F2_BSRC}},   /* (after 0.3) */
 };
 static const char *const PG_FX_T[NPG_FX] = {"XFX", "DELAY", "DELAY 2", "RESON", "TAPE LFO", "FILTER", "EQ", "OUT", "REVERB",
-                                         "REVERB 2"};
+                                         "REVERB 2", "FOLLOW"};
 static const pref_t PG_SEQ[3][4] = {
     {{K_SQ, SQ_LEN}, {K_SQ, SQ_START}, {K_SQ, SQ_SWING}, {K_SQ, SQ_HALF}},
     {{K_SQ, SQ_TLEN}, {K_SQ, SQ_PLEN}, {K_SQ, SQ_MLEN}, {K_SQ, SQ_STRETCH}},
@@ -325,6 +327,15 @@ static pval_t pval(pref_t r)
         if (vi <= 1u) v.fmt = r.idx == VX_GRAIN ? F_OFFN : r.idx == VX_SPEED ? F_SPEED : F_GMS;
         break;
     }
+    case K_F2:
+        v.p = &P.fx2[r.idx];
+        v.name = F2_NAMES[r.idx];
+        switch (r.idx) {
+        case F2_BEAT: v.fmt = F_BIP; break;
+        case F2_BATK: case F2_BREL: v.fmt = F_FMS; break;
+        case F2_BSRC: v.max = 3; v.fmt = F_LIST; v.list = L_BSRC; break;
+        }
+        break;
     case K_SL:
         if (r.idx == SL_LEN) { v.p = &P.slen[sec]; v.min = 1; v.max = 16; v.name = "LEN"; }
         else { v.p = &P.stretch; v.max = 1; v.fmt = F_LIST; v.list = L_OFFON; v.name = "STRTCH"; v.bit = (uint8_t)(1u << sec); }
@@ -400,6 +411,7 @@ static void fmt_val(const pval_t *v, char *d)
     case F_OMNI: if (!x) put_s(d, "OMNI"); else put_u(d, (uint32_t)x); break;
     case F_SPEED: d = put_u(d, (uint32_t)x * 100u / 64u); put_s(d, "%"); break;   /* 64: 100 % */
     case F_GMS: d = put_u(d, (220u + (uint32_t)x * 28u) / 44u); put_s(d, "ms"); break;
+    case F_FMS: d = put_u(d, follow_ms(x)); put_s(d, "ms"); break;   /* FOLLOW's attack / release */
     case F_OFFN: if (!x) put_s(d, "OFF"); else put_u(d, (uint32_t)x); break;
     default:
         if (v->p == &P.remix && !x) put_s(d, "OFF");

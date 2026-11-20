@@ -10,7 +10,9 @@
  *              REFLEX  a resonant low pass, L and R swept in mirror a beat a cycle: X the cutoff, Y the resonance
  *              PITCH   a two-grain pitch shifter: X the grain (12 .. 92 ms), Y the pitch (-12 .. +12)
  *            SLICE, FREEZE and PITCH share the REPEAT's buffer, SPIN the comb's: only the chosen effect runs
- *   FILTER   12 dB low pass, its cutoff moved by the mod lane and by the level (TRK)
+ *   FILTER   12 dB low pass, its cutoff moved by the mod lane and by the level (TRK); FOLLOW (after 0.3): the beat
+ *            moves it too: an envelope follower on the mix, the kick, kick + snare or all the drums, its attack and
+ *            release; BEAT over the middle opens the filter on the hits, under it closes it (64: off)
  *   EQ       lo / mid / hi and a saturating AMP
  *   DELAY    stereo, tempo synced in 16ths (0: a chorus), feedback, damping, width (cross feedback); RESON: a
  *            resonant LP / BP / HP in the loop with soft limiting, a low cut going in, feedback inverted; TAPE LFO:
@@ -54,6 +56,7 @@ static struct {
     int32_t ps_d;
     /* filter */
     svf_t mf[2]; int32_t mcut, mres, follow;
+    int32_t beat;                               /* FOLLOW's envelope, Q15 */
     /* eq */
     int32_t lo1[2], lo2[2];
     /* delay */
@@ -68,6 +71,9 @@ static struct {
     int32_t norm_env, norm_g;
     int32_t gate_now;                           /* the GATE's gain now, Q15 */
 } X = {.type = 255, .norm_g = 4096, .rp = {255, 255, 255, 255}, .gate_now = 32767};
+
+/* (after 0.3) fx2[] for a new project: everything at rest (0.2 and 0.3 projects sound the same) */
+static const uint8_t FX2_0[NFX2] = {64, 10, 50, BS_KICK,   0, 20, 90, 50,   0, BS_KS, 80, 64};
 
 static int32_t mix15(int32_t dry, int32_t wet, int32_t m) { return dry + MUL15(wet - dry, m); }
 static int32_t fold15(int32_t x)                /* a triangle fold: whatever goes past full scale comes back */
@@ -373,12 +379,49 @@ static void xfx(int32_t *b, uint32_t n)
     }
 }
 
+/* FOLLOW: the times its ATTACK and RELEASE stand for (ms, to about 2/3), and their one-pole steps per block */
+static uint32_t follow_blocks(uint32_t x) { return 1u + x * x / 32u; }   /* 1 .. 505 blocks of 32 */
+static uint32_t follow_ms(uint32_t x) { return follow_blocks(x) * 32u * 1000u / 44100u; }
+
+/* the level FOLLOW listens to, Q15: the mix's peak, or the drums' envelopes (no ringing, no detection needed) */
+static int32_t voice_level(uint32_t vi)
+{
+    const voice_t *v = &V[vi];
+    uint32_t e;
+    if (!v->on) return 0;
+    e = v->env;
+    if (vi == V_SNARE && !v->sm) e = v->nenv > v->penv ? v->nenv : v->penv;   /* (the synth snare's two envelopes) */
+    return MUL15((int32_t)(e >> 15), v->lvl);
+}
+static void beat_follow(int32_t mixpeak)
+{
+    int32_t lev, k;
+    switch (P.fx2[F2_BSRC]) {
+    case BS_MIX: lev = mixpeak; break;
+    case BS_KICK: lev = voice_level(V_KICK); break;
+    case BS_KS: lev = voice_level(V_KICK) + voice_level(V_SNARE); break;
+    default: lev = voice_level(V_KICK) + voice_level(V_SNARE) + voice_level(V_HATC) + voice_level(V_HATO); break;
+    }
+    lev = lev > 32767 ? 32767 : lev;
+    k = lev > X.beat ? (int32_t)follow_blocks(P.fx2[F2_BATK]) : (int32_t)follow_blocks(P.fx2[F2_BREL]);
+    k = (lev - X.beat) / k;                     /* (32-bit) */
+    X.beat += k ? k : (lev > X.beat) - (lev < X.beat);   /* (the last steps one at a time: it settles exactly) */
+}
+
 static void master_filter(int32_t *b, uint32_t n)
 {
-    int32_t cut = P.fx[FX_FCUT], res = P.fx[FX_FRES], peak = 0;
+    int32_t cut = P.fx[FX_FCUT], res = P.fx[FX_FRES], peak = 0, beat = (int32_t)P.fx2[F2_BEAT] - 64;
     uint32_t i, c;
     cut += ((int32_t)P.fx[FX_FMOD] - 64) * mod_now / 8;
     cut += MUL15(X.follow, (int32_t)P.fx[FX_FTRK]) >> 1;
+    if (beat) {                                 /* FOLLOW (64: off, not even listening) */
+        int32_t mp = 0;
+        if (P.fx2[F2_BSRC] == BS_MIX)
+            for (i = 0; i < 2u * n; i++) { int32_t a = b[i] < 0 ? -b[i] : b[i]; if (a > mp) mp = a; }
+        beat_follow(mp);
+        cut += MUL15(X.beat, beat * 4);         /* +-63: up to about +-2 sweeps of the range at full level */
+        if (cut > 126) cut = 126;               /* (it keeps running wide open: no jump when it closes again) */
+    } else X.beat = 0;
     cut = clampi(cut, 0, 127);
     if (cut >= 127 && res < 4) { X.mcut = 255; return; }
     if (cut != X.mcut || res != X.mres) {

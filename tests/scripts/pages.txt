@@ -12,6 +12,7 @@
 650 btn 2
 700 btn 2
 750 btn 2
+800 btn 2
 900 shot
 1000 btn 2
 1050 btn 2
@@ -19,21 +20,22 @@
 1150 btn 2
 1200 btn 2
 1250 btn 2
-1400 shot
-1500 btn 13
-1600 shot
-1700 btn 13
-1800 btn 2
+1450 shot
+1550 btn 13
+1650 shot
+1750 btn 13
 1850 btn 2
 1900 btn 2
 1950 btn 2
-2100 btn 13
-2200 shot
-2300 btn 13
-2600 btn 10
-2650 enc 0 1
-2700 enc 0 1
-2800 keys 0x10
-2850 keys 0
-2900 shot
-3100 end
+2000 btn 2
+2050 btn 2
+2250 btn 13
+2350 shot
+2450 btn 13
+2750 btn 10
+2800 enc 0 1
+2850 enc 0 1
+2950 keys 0x10
+3000 keys 0
+3050 shot
+3250 end
