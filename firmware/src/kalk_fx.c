@@ -725,7 +725,7 @@ static void pulp(int32_t *b, uint32_t n)
     pan_gains(P.fx2[F2_PPAN], &gl, &gr);
     for (i = 0; i < n; i++) {
         int32_t f = svf_run(&U.lp, (b[2u * i] + b[2u * i + 1u]) >> 1, 0), s;
-        if (U.cnt < 0x10000u) U.cnt++;
+        if (U.cnt < 60000u) U.cnt++;
         if (U.armed && f > 96) {                /* a rising crossing (with a little hysteresis): a period */
             if (U.cnt >= pmin && U.cnt <= pmax) U.tinc = (int32_t)(0xFFFFFFFFu / U.cnt);
             U.cnt = 0; U.armed = 0;
