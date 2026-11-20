@@ -315,6 +315,54 @@ int main(void)
         check(settled[0] == 64 && settled[1] == 64 && settled[3] == 64, "FOLLOW: it settles back exactly once the hits are gone");
     }
 
+    /* PULP (after 0.3): struck by the kick's hits, it sounds at the pitch it hears (110 Hz, then 165 Hz), decays,
+     * and LEVEL 0 adds nothing */
+    {
+        static int32_t b[2 * B], in[2 * B];
+        static const double HZ[2] = {110, 165};
+        uint32_t m, f, h, same = 1;
+        double ph = 0, e_after = 0, e_start = 0;
+        for (m = 0; m < 2u; m++) {
+            double re[3] = {0, 0, 0}, im[3] = {0, 0, 0}, en[3];
+            static const double PROBE[3] = {0.5, 1.0, 2.0};
+            fx_reset(); fx_neutral(); memset(&U, 0, sizeof U); U.hi = -1;
+            P.fx2[F2_PLVL] = 100; P.fx2[F2_PTRIG] = BS_KICK; P.fx2[F2_PGLIDE] = 20; P.fx2[F2_PDEC] = 127;
+            for (f = 0; f < FS; f += B) {
+                if (f % (FS / 4) == 0) pulp_hits |= 1u << V_KICK;   /* a kick every quarter second */
+                for (i = 0; i < B; i++, ph += 2 * M_PI * HZ[m] / FS) b[2 * i] = b[2 * i + 1] = in[2 * i] = (int32_t)(6000 * sin(ph));
+                pulp(b, B);
+                if (f > FS / 2)                 /* (the pulp alone: what it added) */
+                    for (h = 0; h < 3u; h++)
+                        for (i = 0; i < B; i++) {
+                            double w = 2 * M_PI * HZ[m] * PROBE[h] * (f + i) / FS, x = b[2 * i] - in[2 * i];
+                            re[h] += x * cos(w); im[h] += x * sin(w);
+                        }
+            }
+            for (h = 0; h < 3u; h++) en[h] = re[h] * re[h] + im[h] * im[h];
+            printf("     PULP hearing %.0f Hz: its energy at x0.5 / x1 / x2 %.2g %.2g %.2g\n", HZ[m], en[0], en[1], en[2]);
+            check(en[1] > 20 * en[0] && en[1] > 20 * en[2], m ? "PULP: follows the pitch to 165 Hz" : "PULP: sounds at the pitch it hears (110 Hz)");
+        }
+        /* it decays: struck once, short DECAY, then silence in, silence out */
+        fx_reset(); fx_neutral(); memset(&U, 0, sizeof U); U.hi = -1;
+        P.fx2[F2_PLVL] = 100; P.fx2[F2_PTRIG] = BS_KICK; P.fx2[F2_PDEC] = 30;
+        pulp_hits |= 1u << V_KICK;
+        for (f = 0; f < FS; f += B) {
+            memset(b, 0, sizeof b);
+            pulp(b, B);
+            for (i = 0; i < 2 * B; i++) { double x = b[i]; if (f < FS / 50) e_start += x * x; else if (f > FS / 2) e_after += x * x; }
+        }
+        check(e_start > 1e6 && e_after == 0, "PULP: struck, it decays to silence");
+        /* LEVEL 0: the sound as it was, even with hits */
+        fx_reset(); fx_neutral(); memset(&U, 0, sizeof U); U.hi = -1;
+        for (f = 0; f < FS / 4; f += B) {
+            pulp_hits |= 1u;
+            for (i = 0; i < 2 * B; i++) in[i] = b[i] = noise15();
+            pulp(b, B);
+            if (memcmp(b, in, sizeof b)) same = 0;
+        }
+        check(same && pulp_hits == 0, "PULP LEVEL 0: adds nothing (and forgets the hits)");
+    }
+
     /* a 0.3 project (step 4's layout): everything it had is kept; the EXTRA pages and fx2[] keep their defaults */
     {
         static project03_t o;

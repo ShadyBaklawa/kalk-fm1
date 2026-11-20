@@ -20,6 +20,10 @@
  *   REVERB   a metallic FDN at half rate: 4 diffusers, 4 lines (Hadamard), RT60, size, damping, low cut,
  *            modulation, width; fed from the mix (SEND) and from the delay (DLY>RV)
  *   OUT      DIRT (distortion), NORM (a maximiser), GAIN
+ *   PULP     (after 0.3) LIME.lite's Automatik Perc: a percussion oscillator struck by the drums (TRIG) that tracks
+ *            the pitch of what plays: zero crossings of the drums, low passed at HI, periods between LO and HI;
+ *            GLIDE how fast it follows, DECAY, WAVE (sine .. triangle .. square), PAN; LEVEL 0: off. Before the
+ *            effects, so they take it too
  *   GATE     (while playing) a 16-step lane at 1/8, 1/16 or 1/32 that cuts the sound on its steps: PRE (before the
  *            effects: the echoes and the reverb ring on) or POST (after them: hard cuts); DEPTH, SMOOTH (the ramp)
  */
@@ -73,7 +77,7 @@ static struct {
 } X = {.type = 255, .norm_g = 4096, .rp = {255, 255, 255, 255}, .gate_now = 32767};
 
 /* (after 0.3) fx2[] for a new project: everything at rest (0.2 and 0.3 projects sound the same) */
-static const uint8_t FX2_0[NFX2] = {64, 10, 50, BS_KICK,   0, 20, 90, 50,   0, BS_KS, 80, 64};
+static const uint8_t FX2_0[NFX2] = {64, 10, 50, BS_KICK,   0, 20, 60, 50,   0, BS_KS, 10, 64};
 
 static int32_t mix15(int32_t dry, int32_t wet, int32_t m) { return dry + MUL15(wet - dry, m); }
 static int32_t fold15(int32_t x)                /* a triangle fold: whatever goes past full scale comes back */
@@ -671,10 +675,75 @@ static void gate(int32_t *b, uint32_t n, uint32_t where)
     }
 }
 
+/* ---- PULP (after 0.3) */
+static struct {
+    svf_t lp; int32_t hi;                       /* the tracker's low pass, at HI */
+    uint32_t cnt; uint8_t armed;                /* frames since the last rising crossing; below the lower threshold */
+    int32_t inc, tinc;                          /* the oscillator's step, gliding to what the tracker heard */
+    uint32_t ph, env;
+    int32_t pk;                                 /* TRIG MIX: the recent peak, for the onsets */
+} U = {.hi = -1};
+static const uint8_t PT_MASK[4] = {0, 1u << V_KICK, (1u << V_KICK) | (1u << V_SNARE),
+                                   (1u << V_KICK) | (1u << V_SNARE) | (1u << V_HATC) | (1u << V_HATO)};
+
+static int32_t pulp_wave(uint32_t ph, int32_t w)   /* WAVE: 0 sine .. 64 triangle .. 127 square (soft) */
+{
+    int32_t s = sin15(ph), t = tri15(ph - 0x40000000u);   /* (the triangle in phase with the sine) */
+    if (w < 64) return s + (t - s) * w / 64;
+    return t + (drive15(s, 4096) - t) * (w - 64) / 63;
+}
+
+static void pulp(int32_t *b, uint32_t n)
+{
+    uint32_t i, hits = pulp_hits, lo, hi, pmin, pmax;
+    int32_t lvl = P.fx2[F2_PLVL], amp, gl, gr, w = P.fx2[F2_PWAVE], k, d;
+    uint32_t ek;
+    pulp_hits = 0;
+    if (!lvl) { U.env = 0; return; }
+    lo = SVF_HZ[P.fx2[F2_PLO] & 127u]; hi = SVF_HZ[P.fx2[F2_PHI] & 127u];
+    if (lo > hi) { uint32_t x = lo; lo = hi; hi = x; }
+    pmin = 44100u / hi; pmax = 44100u / lo;
+    if (pmin < 3u) pmin = 3u;
+    if (U.hi != (int32_t)P.fx2[F2_PHI]) {
+        U.hi = P.fx2[F2_PHI];
+        svf_set(&U.lp, SVF_G[P.fx2[F2_PHI] & 127u], 0);
+        if (!U.tinc) U.tinc = U.inc = (int32_t)(lo * 97392u);   /* (nothing heard yet: LO) */
+    }
+    if (P.fx2[F2_PTRIG] == BS_MIX) {            /* MIX: an onset is a peak well over the recent ones */
+        int32_t pk = 0;
+        for (i = 0; i < 2u * n; i++) { int32_t a = b[i] < 0 ? -b[i] : b[i]; if (a > pk) pk = a; }
+        if (pk > 2 * U.pk + 1500) hits = 1;
+        else hits = 0;
+        U.pk = pk > U.pk ? pk : U.pk - (U.pk >> 4);
+    } else hits &= PT_MASK[P.fx2[F2_PTRIG] & 3u];
+    if (hits) U.env = ENV_ONE;
+    ek = DECAY_K[P.fx2[F2_PDEC] & 127u];
+    k = (int32_t)follow_blocks(P.fx2[F2_PGLIDE]);   /* GLIDE: 1 .. 505 blocks */
+    d = (U.tinc - U.inc) / k;
+    U.inc += d ? d : (U.tinc > U.inc) - (U.tinc < U.inc);
+    amp = lvl * lvl * 2;
+    pan_gains(P.fx2[F2_PPAN], &gl, &gr);
+    for (i = 0; i < n; i++) {
+        int32_t f = svf_run(&U.lp, (b[2u * i] + b[2u * i + 1u]) >> 1, 0), s;
+        if (U.cnt < 0x10000u) U.cnt++;
+        if (U.armed && f > 96) {                /* a rising crossing (with a little hysteresis): a period */
+            if (U.cnt >= pmin && U.cnt <= pmax) U.tinc = (int32_t)(0xFFFFFFFFu / U.cnt);
+            U.cnt = 0; U.armed = 0;
+        } else if (f < -96) U.armed = 1;
+        if (U.env < (1u << 17)) continue;
+        U.ph += (uint32_t)U.inc;
+        s = MUL15(MUL15(pulp_wave(U.ph, w), (int32_t)(U.env >> 15)), amp);
+        U.env = env_dec(U.env, ek);
+        b[2u * i] += MUL15(s, gl);
+        b[2u * i + 1u] += MUL15(s, gr);
+    }
+}
+
 static void fx_render(int32_t *b, uint32_t n)
 {
     int32_t dry[32];                            /* (n is BLK, 32) the mix before the delay, mono: the reverb's SEND */
     uint32_t i;
+    pulp(b, n);
     gate(b, n, GM_PRE);
     xfx(b, n);
     master_filter(b, n);

@@ -170,7 +170,7 @@ static const char *const VX_NAMES[NVOICE][4] = {
     {"FM ATK", "FM DEC", "DROP", "NOISFM"}, {"", "", "", ""}};
 static const pref_t PG_LANE[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_SQ, SQ_SWING}, {K_SQ, SQ_LEN}};
 static const pref_t PG_MODL[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_FX, FX_MODFX}, {K_FX, FX_FMOD}};
-#define NPG_FX 11u                              /* the FX pages (XFX is the first) */
+#define NPG_FX 13u                              /* the FX pages (XFX is the first) */
 static const pref_t PG_FX[NPG_FX][4] = {
     {{K_FX, FX_XTYPE}, {K_FX, FX_X}, {K_FX, FX_Y}, {K_FX, FX_XAUTO}},
     {{K_FX, FX_DL}, {K_FX, FX_DR}, {K_FX, FX_DFB}, {K_FX, FX_DSEND}},
@@ -183,9 +183,11 @@ static const pref_t PG_FX[NPG_FX][4] = {
     {{K_FX, FX_RTIME}, {K_FX, FX_RSIZE}, {K_FX, FX_RDAMP}, {K_FX, FX_RSEND}},
     {{K_FX, FX_RLOW}, {K_FX, FX_RMOD}, {K_FX, FX_RWIDTH}, {K_FX, FX_RDLY}},
     {{K_F2, F2_BEAT}, {K_F2, F2_BATK}, {K_F2, F2_BREL}, {K_F2, F2_BSRC}},   /* (after 0.3) */
+    {{K_F2, F2_PLVL}, {K_F2, F2_PLO}, {K_F2, F2_PHI}, {K_F2, F2_PDEC}},
+    {{K_F2, F2_PWAVE}, {K_F2, F2_PTRIG}, {K_F2, F2_PGLIDE}, {K_F2, F2_PPAN}},
 };
 static const char *const PG_FX_T[NPG_FX] = {"XFX", "DELAY", "DELAY 2", "RESON", "TAPE LFO", "FILTER", "EQ", "OUT", "REVERB",
-                                         "REVERB 2", "FOLLOW"};
+                                         "REVERB 2", "FOLLOW", "PULP", "PULP 2"};
 static const pref_t PG_SEQ[3][4] = {
     {{K_SQ, SQ_LEN}, {K_SQ, SQ_START}, {K_SQ, SQ_SWING}, {K_SQ, SQ_HALF}},
     {{K_SQ, SQ_TLEN}, {K_SQ, SQ_PLEN}, {K_SQ, SQ_MLEN}, {K_SQ, SQ_STRETCH}},
@@ -333,7 +335,12 @@ static pval_t pval(pref_t r)
         switch (r.idx) {
         case F2_BEAT: v.fmt = F_BIP; break;
         case F2_BATK: case F2_BREL: v.fmt = F_FMS; break;
-        case F2_BSRC: v.max = 3; v.fmt = F_LIST; v.list = L_BSRC; break;
+        case F2_BSRC: case F2_PTRIG: v.max = 3; v.fmt = F_LIST; v.list = L_BSRC; break;
+        case F2_PLVL: v.fmt = F_OFFN; break;
+        case F2_PLO: case F2_PHI: v.fmt = F_HZ; break;
+        case F2_PDEC: v.fmt = F_MS; break;
+        case F2_PGLIDE: v.fmt = F_FMS; break;
+        case F2_PPAN: v.fmt = F_PAN; break;
         }
         break;
     case K_SL:

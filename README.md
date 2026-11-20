@@ -120,6 +120,8 @@ At GRAIN OFF and SPEED 100 % the sample plays as before. A project saved by 0.2 
 | REVERB | TIME (RT60 0.12-21.6 s) | SIZE | DAMP (the highs die first) | SEND (from the mix) |
 | REVERB 2 | LOW (cuts the lows going in: keeps the kick dry) | MOD (wobble, for a metallic shimmer) | WIDTH (0: mono) | DLY>RV (the echoes into the reverb) |
 | FOLLOW | BEAT: the beat moves the FILTER's cutoff: over 0 the hits open it, under 0 they close it (0: off) | ATTACK | RELEASE | SOURCE: MIX, KICK, K+SN, DRUMS |
+| PULP | LEVEL (OFF: off) | LO | HI (the pitch it listens for) | DECAY |
+| PULP 2 | WAVE (sine, triangle, square) | TRIG: what strikes it: MIX (its onsets), KICK, K+SN, DRUMS | GLIDE (how fast it follows the pitch) | PAN |
 
 The delay is a tape-style reson delay: with RESON and TAPE LFO at rest it is the plain delay, and once the filter is in,
 the echoes are soft-limited, so high RES and FDBK ring and sing rather than clip.
@@ -139,6 +141,9 @@ ones, synced to the bar while playing:
 | SPIN | a rotating speaker's speed: 1/16 .. 1 bar a turn | its depth (Doppler and level, L and R opposite) |
 | REFLEX | a resonant low pass's cutoff, L and R swept in mirror, a beat a cycle | resonance |
 | PITCH | the grain, 12 .. 92 ms | -12 .. +12 semitones |
+
+PULP is LIME.lite's Automatik Perc: a percussion oscillator struck by the drums that plays at the pitch it hears
+them at (between LO and HI), before the effects.
 
 Only the chosen XFX runs; SLICE, FREEZE and PITCH use REPEAT's buffer, so they cost no memory.
 

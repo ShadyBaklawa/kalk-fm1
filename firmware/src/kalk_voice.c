@@ -33,6 +33,7 @@ typedef struct {
 static voice_t V[NV_RUN];
 static volatile int8_t mod_now;                /* the mod lane's value now (0..15) */
 static volatile int8_t pitch_all;              /* FX_PITCH - 12: the out section's transpose */
+static volatile uint8_t pulp_hits;             /* (after 0.3) a bit per voice struck since PULP last looked */
 
 /* ---- the variants (WAV) */
 typedef struct { uint8_t sw, pdec, click, noise, shape, note; } kick_var_t;   /* sw: sweep, 16 = one octave up */
@@ -239,6 +240,7 @@ static void voice_trigger(uint32_t vi, uint32_t acc, int32_t semi, int32_t vel)
         }
     }
     v->on = 1;
+    pulp_hits |= (uint8_t)(1u << vi);
 }
 
 /* ---- the renders: add n frames (L R) */
