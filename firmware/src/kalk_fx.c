@@ -814,7 +814,7 @@ static void tor_targets(void)                   /* when the step or a knob moved
 
 static void torsion(int32_t *b, uint32_t n)
 {
-    int32_t blend = (int32_t)P.tor[T_BLEND] * 32767 / 127, e[NT_ANIM], cg, g12, sh, fbg, peak = 0, thr, k15, nbp, drv, fg, sp;
+    int32_t blend = P.tor[T_BLEND] >= 127u ? 32767 : (int32_t)P.tor[T_BLEND] * 258, e[NT_ANIM], cg, g12, sh, fbg, peak = 0, thr, k15, nbp, drv, fg, sp;
     int filt;
     uint32_t i, c, rinc;
     if (!blend) { T.on = 0; return; }           /* (off: nothing runs) */
