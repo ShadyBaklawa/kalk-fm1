@@ -3,6 +3,7 @@
  * Checks the reverb rings, decays at about its TIME, never runs away (every TIME, SIZE, DAMP), stays silent at
  * send 0, and that a 0.2 project's effects (no reverb fields) leave it off. Writes build/host/reverb.wav.
  * The reson delay: the 0.2 delay bit for bit at rest, resonance at its FREQ, no runaway, the LFO, INVERT.
+ * The glitch XFX (CHOP SLICE FREEZE SPIN REFLEX PITCH): bounded, nothing at XMIX 0, each does what it says.
  *   cc -O2 -Ifirmware/src -o build/host/fx_test tests/fx_test.c -lm && build/host/fx_test */
 #include <stdint.h>
 #include <stdio.h>
@@ -65,6 +66,9 @@ static void run(double secs, int kind, double *env, double *pk, FILE *w)
         if (w) for (i = 0; i < 2 * B; i++) { int16_t s = (int16_t)clip15(b[i]); fwrite(&s, 2, 1, w); }
     }
 }
+
+/* the bar's position at frame f, as the sequencer would have it (5512 frames a 16th) */
+static void gl_pos(uint32_t f) { gstep = f / 5512u; S.frac = (f % 5512u) * (Q24 / 5512u); }
 
 static double db(double x) { return 20 * log10(x + 1e-12); }
 
@@ -288,6 +292,162 @@ int main(void)
         v = FS; fwrite(&v, 4, 1, w); v = FS * 4; fwrite(&v, 4, 1, w); { uint16_t h[2] = {4, 16}; fwrite(h, 2, 2, w); }
         fwrite("data", 1, 4, w); fwrite(&n, 4, 1, w);
         fclose(w);
+    }
+
+    /* ---- the glitch XFX (after 0.2) */
+    {
+        static const char *const NM[6] = {"CHOP", "SLICE", "FREEZE", "SPIN", "REFLEX", "PITCH"};
+        static const uint8_t XS[4] = {0, 40, 90, 127}, YS[3] = {0, 64, 127};
+        static int32_t b[2 * B], in[2 * B];
+        uint32_t t, xi, yi, k, f;
+        int bounded = 1, thru = 1;
+        double worst = 0, wmax = 0;
+        playing = 1;
+        for (t = XF_CHOP; t < NXF; t++)
+            for (xi = 0; xi < 4u; xi++)
+                for (yi = 0; yi < 3u; yi++) {
+                    fx_reset(); fx_neutral(); P.fx[FX_XTYPE] = (uint8_t)t; fx_x = XS[xi]; fx_y = YS[yi];
+                    for (f = 0; f < FS; f += B) {
+                        gl_pos(f);
+                        for (i = 0; i < 2 * B; i++) b[i] = noise15() * 2;
+                        xfx(b, B);
+                        for (i = 0; i < 2 * B; i++) { double a = fabs(b[i] / 32768.0); if (a > worst) worst = a; }
+                    }
+                    if (worst > 4.0) { bounded = 0; printf("     %s X %u Y %u: %.2f\n", NM[t - XF_CHOP], fx_x, fx_y, worst); }
+                    worst = worst > wmax ? (wmax = worst) : wmax; worst = 0;
+                    P.fx[FX_XMIX] = 0;              /* XMIX 0: the input, untouched */
+                    for (f = 0; f < FS / 4; f += B) {
+                        gl_pos(f);
+                        for (i = 0; i < 2 * B; i++) in[i] = b[i] = noise15() * 2;
+                        xfx(b, B);
+                        if (memcmp(b, in, sizeof b)) thru = 0;
+                    }
+                }
+        printf("     every glitch XFX, X and Y at their ends: the loudest %.2f of full scale\n", wmax);
+        check(bounded, "glitch XFX: bounded at every X and Y (noise in)");
+        check(thru, "glitch XFX: XMIX 0 leaves the sound alone");
+
+        /* CHOP: X 0 cuts each 16th short; stopped, it passes */
+        {
+            double early = 0, late = 0, stopped = 0;
+            fx_reset(); fx_neutral(); P.fx[FX_XTYPE] = XF_CHOP; fx_x = 0; fx_y = 64;
+            for (f = 0; f < 4u * 5512u; f += B) {
+                uint32_t ph;
+                gl_pos(f);
+                ph = f % 5512u;
+                for (i = 0; i < 2 * B; i++) b[i] = 16000;
+                xfx(b, B);
+                for (i = 0; i < 2 * B; i++) { if (ph < 100u) early += fabs(b[i]); else if (ph > 2756u) late += fabs(b[i]); }
+            }
+            playing = 0;
+            for (f = 0; f < 5512u; f += B) {
+                for (i = 0; i < 2 * B; i++) b[i] = 16000;
+                xfx(b, B);
+                if (f > 64u) for (i = 0; i < 2 * B; i++) stopped += fabs(b[i] - 16000);
+            }
+            playing = 1;
+            printf("     %s: the first 100 frames of each 16th %.0f, its second half %.0f\n", NM[0], early, late);
+            check(early > 1e5 && late == 0, "CHOP X 0: sound at each 16th's start, silence in its second half");
+            check(stopped == 0, "CHOP: stopped, it passes the sound");
+        }
+
+        /* SLICE, Y at the end (every slice backwards), 1/16: a click 100 frames into each 16th comes back near the
+         * end of the next one; Y 0 (pattern 0x8888): only every 4th 16th is turned */
+        {
+            uint32_t late = 0, total = 0, steps_moved = 0;
+            for (k = 0; k < 2u; k++) {
+                fx_reset(); fx_neutral(); P.fx[FX_XTYPE] = XF_SLICE; fx_x = 64; fx_y = k ? 0 : 127;
+                for (f = 0; f < 16u * 5512u; f += B) {
+                    double pk = 0; uint32_t at = 0;
+                    gl_pos(f);
+                    for (i = 0; i < B; i++) b[2 * i] = b[2 * i + 1] = ((f + i) % 5512u == 100u) ? 30000 : 0;
+                    xfx(b, B);
+                    for (i = 0; i < B; i++) if (fabs(b[2 * i]) > pk) { pk = fabs(b[2 * i]); at = (f + i) % 5512u; }
+                    if (f >= 5512u * 2u && pk > 15000) {
+                        if (!k) { total++; if (at > 5000u) late++; }
+                        else if (at > 5000u) steps_moved++;
+                    }
+                }
+            }
+            printf("     %s: all backwards: %u of %u clicks late in their 16th; pattern 1: %u moved (14 steps)\n", NM[1], late, total, steps_moved);
+            check(total >= 13u && late == total, "SLICE: every 16th plays the last one backwards (the click comes late)");
+            check(steps_moved >= 3u && steps_moved <= 4u, "SLICE pattern 1: only every 4th 16th is turned");
+        }
+
+        /* FREEZE: listening (X under the notch), then frozen: the loop plays on with no input; Y 0: it stops */
+        {
+            double rms_in = 0, rms_frz = 0, pk_end = 0;
+            fx_reset(); fx_neutral(); P.fx[FX_XTYPE] = XF_FREEZE; fx_x = 0; fx_y = 64;
+            for (f = 0; f < FS; f += B) {
+                gl_pos(f);
+                for (i = 0; i < 2 * B; i++) b[i] = noise15();
+                xfx(b, B);
+                for (i = 0; i < 2 * B; i++) rms_in += (double)b[i] * b[i];
+            }
+            fx_x = 127;
+            for (f = FS; f < 3 * FS; f += B) {
+                gl_pos(f);
+                memset(b, 0, sizeof b);
+                xfx(b, B);
+                for (i = 0; i < 2 * B; i++) rms_frz += (double)b[i] * b[i];
+            }
+            fx_y = 0;
+            for (f = 3 * FS; f < 5 * FS; f += B) {
+                gl_pos(f);
+                memset(b, 0, sizeof b);
+                xfx(b, B);
+                if (f > 4 * FS) for (i = 0; i < 2 * B; i++) if (fabs(b[i]) > pk_end) pk_end = fabs(b[i]);
+            }
+            rms_in = sqrt(rms_in / (2.0 * FS)); rms_frz = sqrt(rms_frz / (4.0 * FS));
+            printf("     %s: in %.0f, frozen (no input) %.0f, after Y 0 a peak of %.0f\n", NM[2], rms_in, rms_frz, pk_end);
+            check(rms_frz > 0.7 * rms_in, "FREEZE: the loop plays on after the input stops");
+            check(pk_end == 0, "FREEZE Y 0: the tape stops (silence)");
+        }
+
+        /* SPIN and REFLEX: a mono input comes out stereo; SPIN at depth 0: still mono */
+        for (k = 0; k < 3u; k++) {
+            double side = 0, mid = 0;
+            fx_reset(); fx_neutral(); P.fx[FX_XTYPE] = k == 2u ? XF_REFLEX : XF_SPIN; fx_x = 64; fx_y = k == 1u ? 0 : 100;
+            for (f = 0; f < 2 * FS; f += B) {
+                gl_pos(f);
+                for (i = 0; i < B; i++) b[2 * i] = b[2 * i + 1] = noise15();
+                xfx(b, B);
+                if (f > FS / 4) for (i = 0; i < B; i++) {
+                    double l = b[2 * i], r = b[2 * i + 1];
+                    side += (l - r) * (l - r); mid += (l + r) * (l + r);
+                }
+            }
+            printf("     %s Y %u: side / mid %.3f\n", k == 2u ? NM[4] : NM[3], fx_y, sqrt(side / (mid + 1)));
+            if (k == 1u) check(side == 0, "SPIN at depth 0: mono stays mono");
+            else check(sqrt(side / (mid + 1)) > 0.1, k ? "REFLEX: L and R sweep apart (stereo from mono)" : "SPIN: the speaker turns (stereo from mono)");
+        }
+
+        /* PITCH: 440 Hz in; Y at the ends: an octave down, an octave up; the middle: unchanged */
+        {
+            static const uint8_t PY_[3] = {0, 64, 127};
+            static const double HZ[3] = {220, 440, 880};
+            for (k = 0; k < 3u; k++) {
+                double e[3] = {0, 0, 0}, re[3] = {0, 0, 0}, im[3] = {0, 0, 0}, ph = 0;
+                uint32_t h, best = 0;
+                fx_reset(); fx_neutral(); P.fx[FX_XTYPE] = XF_PITCH; fx_x = 64; fx_y = PY_[k];
+                for (f = 0; f < FS; f += B) {
+                    gl_pos(f);
+                    for (i = 0; i < B; i++, ph += 2 * M_PI * 440.0 / FS) b[2 * i] = b[2 * i + 1] = (int32_t)(16000 * sin(ph));
+                    xfx(b, B);
+                    if (f > FS / 5)
+                        for (h = 0; h < 3u; h++)    /* (a DFT at the three, over 0.8 s) */
+                            for (i = 0; i < B; i++) {
+                                double w = 2 * M_PI * HZ[h] * (f + i) / FS;
+                                re[h] += b[2 * i] * cos(w); im[h] += b[2 * i] * sin(w);
+                            }
+                }
+                for (h = 0; h < 3u; h++) e[h] = re[h] * re[h] + im[h] * im[h];
+                for (h = 1; h < 3u; h++) if (e[h] > e[best]) best = h;
+                printf("     %s Y %u: energy at 220 / 440 / 880 Hz %.2g %.2g %.2g\n", NM[5], PY_[k], e[0], e[1], e[2]);
+                check(best == k, k == 0u ? "PITCH Y 0: an octave down" : k == 1u ? "PITCH Y 64: the same pitch" : "PITCH Y 127: an octave up");
+            }
+        }
+        playing = 0;
     }
     printf(fails ? "FX TESTS FAILED (%d)\n" : "FX TESTS PASSED\n", fails);
     return fails != 0;

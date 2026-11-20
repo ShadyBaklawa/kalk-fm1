@@ -119,7 +119,19 @@ The reverb is a feedback network of four lines with four diffusers before it, at
 it switches itself off once its tail has died away. Projects saved by 0.2 load with the reverb off.
 
 XFX: THRU, CRUSH (bits, rate), BPF, RING (frequency, wobble), COMB (time, feedback), REPEAT (length; Y over the middle
-repeats), LPF, HPF, FOLD (drive, bias), GATE and PAN (rate, depth, tempo synced), FLANGE (rate, depth).
+repeats), LPF, HPF, FOLD (drive, bias), GATE and PAN (rate, depth, tempo synced), FLANGE (rate, depth), and the glitch
+ones, synced to the bar while playing:
+
+| XFX | X | Y |
+|---|---|---|
+| CHOP | how much of each 16th sounds (4 % .. all) | the cut's shape: curved, straight, held |
+| SLICE | the slice: 1/32, 1/16, 1/8 | one of 16 patterns of slices that play the last one backwards |
+| FREEZE | under the first notch: listening; past it, loops the last 1/64 .. 1/4 | under the middle: slows to a stop; over: speeds up |
+| SPIN | a rotating speaker's speed: 1/16 .. 1 bar a turn | its depth (Doppler and level, L and R opposite) |
+| REFLEX | a resonant low pass's cutoff, L and R swept in mirror, a beat a cycle | resonance |
+| PITCH | the grain, 12 .. 92 ms | -12 .. +12 semitones |
+
+Only the chosen XFX runs; SLICE, FREEZE and PITCH use REPEAT's buffer, so they cost no memory.
 
 ## MIDI
 

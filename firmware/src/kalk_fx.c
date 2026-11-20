@@ -1,7 +1,15 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* KALK: the effects, after the voices, in the audio interrupt (32 frames at a time).
  *
- *   XFX      one of 12 effects on an XY pad (K2 = X, K3 = Y); the pad's motion recorded over 4 bars (64 points)
+ *   XFX      one of 18 effects on an XY pad (K2 = X, K3 = Y); the pad's motion recorded over 4 bars (64 points).
+ *            The glitch ones (after 0.2), all synced to the bar while playing:
+ *              CHOP    each 16th cut by an envelope: X its length, Y its shape (curved .. straight .. held)
+ *              SLICE   16ths (or 32nds, 8ths: X) played backwards on the steps of a pattern (Y: 16 patterns)
+ *              FREEZE  X past the first notch loops the last 1/64 .. 1/4 (X); Y slows it to a stop or speeds it up
+ *              SPIN    a rotating speaker: X the speed (1/16 .. 1 bar a turn), Y its depth (Doppler and level)
+ *              REFLEX  a resonant low pass, L and R swept in mirror a beat a cycle: X the cutoff, Y the resonance
+ *              PITCH   a two-grain pitch shifter: X the grain (12 .. 92 ms), Y the pitch (-12 .. +12)
+ *            SLICE, FREEZE and PITCH share the REPEAT's buffer, SPIN the comb's: only the chosen effect runs
  *   FILTER   12 dB low pass, its cutoff moved by the mod lane and by the level (TRK)
  *   EQ       lo / mid / hi and a saturating AMP
  *   DELAY    stereo, tempo synced in 16ths (0: a chorus), feedback, damping, width (cross feedback); RESON: a
@@ -38,6 +46,12 @@ static struct {
     uint32_t cbw;
     uint8_t rp_on, rp_rec; uint32_t rp_len, rp_pos;
     int32_t gate_g;
+    uint32_t rgw;                               /* the glitch ring (rp_buf): where it writes next */
+    int32_t chop_g;
+    uint32_t sl_idx, sl_start, sl_len, sl_k; uint8_t sl_rev;
+    uint8_t fz_on; uint32_t fz_end, fz_p; int32_t fz_spd;
+    int32_t sp_d[2];
+    int32_t ps_d;
     /* filter */
     svf_t mf[2]; int32_t mcut, mres, follow;
     /* eq */
@@ -65,6 +79,167 @@ static int32_t fold15(int32_t x)                /* a triangle fold: whatever goe
 /* the phase of the bar now, in 16ths, Q8 (for the synced LFOs) */
 static uint32_t pos16_q8(void) { return gstep * 256u + (S.frac >> 16); }
 
+/* ---- the glitch effects (after 0.2) */
+#define RG_MASK (RP_LEN - 1u)
+static void ring_rec(const int32_t *b, uint32_t n)   /* the input into the ring, as it is */
+{
+    uint32_t i;
+    for (i = 0; i < n; i++, X.rgw++) {
+        rp_buf[0][X.rgw & RG_MASK] = (int16_t)clip15(b[2u * i]);
+        rp_buf[1][X.rgw & RG_MASK] = (int16_t)clip15(b[2u * i + 1u]);
+    }
+}
+static int32_t edge64(uint32_t k, uint32_t len)  /* a fade in and out at a loop's ends, 64 frames: Q15 */
+{
+    uint32_t e = k < len - k ? k : len - k;
+    return (int32_t)(e < 64u ? e : 64u) * 512;
+}
+static void glitch_reset(void)
+{
+    X.chop_g = 32767; X.sl_idx = 0xFFFFFFFFu; X.sl_rev = 0; X.sl_len = 0; X.fz_on = 0; X.ps_d = 0;
+    X.sp_d[0] = X.sp_d[1] = 160 << 8;
+    svf_reset(&X.f[0]); svf_reset(&X.f[1]);
+}
+
+/* CHOP's gain at p (the 16th's phase, Q8): X the length (4 % .. all of the 16th), Y the shape */
+static int32_t chop_gain(uint32_t p, int32_t x, int32_t y)
+{
+    int32_t len = 10 + x * 246 / 127, t, lin, cur, held;
+    if ((int32_t)p >= len) return 0;
+    t = (int32_t)(p << 15) / len;               /* 0..32767 through the envelope */
+    lin = 32767 - t;
+    cur = MUL15(lin, lin); cur = MUL15(cur, cur);   /* (1-t)^4: a sharp, curved decay */
+    held = MUL15(t, t); held = 32767 - MUL15(held, held);   /* 1-t^4: held, then cut */
+    return y < 64 ? cur + (lin - cur) * y / 64 : lin + (held - lin) * (y - 64) / 63;
+}
+
+/* SLICE's patterns: bit k set = the k-th slice of the bar plays backwards */
+static const uint16_t SL_PAT[16] = {0x8888, 0x2222, 0xAAAA, 0x5555, 0xCCCC, 0x3333, 0xF0F0, 0x0F0F,
+                                    0xFF00, 0x00FF, 0x8080, 0x0808, 0xA0A0, 0x4924, 0x6DB6, 0xFFFF};
+/* FREEZE's loop, in 8ths of a 16th: 1/64 1/32 1/16 1/8 3/16 1/4 */
+static const uint8_t FZ_LEN8[6] = {2, 4, 8, 16, 24, 32};
+/* PITCH: 2^(s/12), Q16, s = -12..12 */
+static const uint32_t PS_R[25] = {32768, 34716, 36781, 38968, 41285, 43740, 46341, 49097, 52016, 55109, 58386, 61858,
+    65536, 69433, 73562, 77936, 82570, 87480, 92682, 98193, 104032, 110218, 116772, 123715, 131072};
+
+static void glitch(int32_t *b, uint32_t n, uint32_t type, int32_t x, int32_t y, int32_t mix)
+{
+    uint32_t i, c;
+    switch (type) {
+    case XF_CHOP: {
+        int32_t g0 = X.chop_g, g1 = playing ? chop_gain(pos16_q8() & 255u, x, y) : 32767;
+        if (g0 == 32767 && g1 == 32767) break;  /* (open: as it is) */
+        for (i = 0; i < n; i++) {
+            int32_t g = g0 + (g1 - g0) * (int32_t)(i + 1u) / (int32_t)n;   /* a ramp across the block: no clicks */
+            for (c = 0; c < 2u; c++) b[2u * i + c] = mix15(b[2u * i + c], MUL15(b[2u * i + c], g), mix);
+        }
+        X.chop_g = g1;
+        break;
+    }
+    case XF_SLICE: {
+        uint32_t sh = 7u + (uint32_t)x * 3u / 128u, idx = pos16_q8() >> sh;   /* 1/32, 1/16, 1/8 */
+        if (idx != X.sl_idx) {                  /* a new slice: the last one is what plays backwards */
+            uint32_t len = X.rgw - X.sl_start;
+            X.sl_len = len > RP_LEN / 2u ? RP_LEN / 2u : len;   /* (the ring holds this one and the last) */
+            X.sl_start = X.rgw; X.sl_idx = idx; X.sl_k = 0;
+            X.sl_rev = playing && X.sl_len >= 128u && ((SL_PAT[(uint32_t)y >> 3] >> (idx & 15u)) & 1u);
+        }
+        if (!playing) X.sl_rev = 0;
+        for (i = 0; i < n; i++, X.sl_k++) {
+            int32_t in[2];
+            for (c = 0; c < 2u; c++) in[c] = b[2u * i + c];
+            rp_buf[0][X.rgw & RG_MASK] = (int16_t)clip15(in[0]);
+            rp_buf[1][X.rgw & RG_MASK] = (int16_t)clip15(in[1]);
+            X.rgw++;
+            if (!X.sl_rev) continue;
+            for (c = 0; c < 2u; c++) {
+                int32_t w;
+                if (X.sl_k < X.sl_len) w = MUL15(rp_buf[c][(X.sl_start - 1u - X.sl_k) & RG_MASK], edge64(X.sl_k, X.sl_len));
+                else w = MUL15(in[c], (int32_t)((X.sl_k - X.sl_len) < 64u ? (X.sl_k - X.sl_len) : 64u) * 512);
+                b[2u * i + c] = mix15(in[c], w, mix);
+            }
+        }
+        break;
+    }
+    case XF_FREEZE: {
+        uint32_t len, len16;
+        if (x < 16) { X.fz_on = 0; ring_rec(b, n); break; }   /* the first notch: listening */
+        len = frames16 * FZ_LEN8[(x - 16) * 6 / 112] / 8u;
+        if (len > RP_LEN - 1u) len = RP_LEN - 1u;
+        if (len < 64u) len = 64u;
+        len16 = len << 16;
+        if (!X.fz_on) { X.fz_on = 1; X.fz_end = X.rgw; X.fz_p = 0; X.fz_spd = 65536; }
+        X.fz_spd = clampi(X.fz_spd + (y - 64) * 3 / 2, 0, 4 << 16);   /* Y: under the middle down to a stop, over: up */
+        if (X.fz_p >= len16) X.fz_p %= len16;   /* (X moved: a shorter loop) */
+        for (i = 0; i < n; i++) {
+            uint32_t k = X.fz_p >> 16, fr = (X.fz_p >> 8) & 255u, k1 = k + 1u < len ? k + 1u : 0u;
+            int32_t e = MUL15(edge64(k, len), X.fz_spd < 16384 ? X.fz_spd * 2 : 32767);   /* (and gone at a stop) */
+            for (c = 0; c < 2u; c++) {
+                int32_t a = rp_buf[c][(X.fz_end - len + k) & RG_MASK], bb = rp_buf[c][(X.fz_end - len + k1) & RG_MASK];
+                b[2u * i + c] = mix15(b[2u * i + c], MUL15(a + (((bb - a) * (int32_t)fr) >> 8), e), mix);
+            }
+            X.fz_p += (uint32_t)X.fz_spd;
+            if (X.fz_p >= len16) X.fz_p -= len16;
+        }
+        break;
+    }
+    case XF_SPIN: {                             /* the horn goes round: one side comes nearer while the other goes */
+        static const uint8_t PER[5] = {1, 2, 4, 8, 16};
+        uint32_t per = PER[x * 5 / 128], ph = pos16_q8() * (0x1000000u / per);
+        int32_t s = playing ? sin15(ph) : 0, dep = y * 256, am = y * 100, d1[2], g[2];
+        d1[0] = (160 << 8) + MUL15(s, dep); d1[1] = (160 << 8) - MUL15(s, dep);   /* Q8 frames: ~3.6 ms +- 2.9 ms */
+        g[0] = 32767 - (MUL15(am, 32767 - s) >> 1); g[1] = 32767 - (MUL15(am, 32767 + s) >> 1);
+        for (i = 0; i < n; i++) {
+            for (c = 0; c < 2u; c++) {
+                int32_t d = X.sp_d[c] + (d1[c] - X.sp_d[c]) * (int32_t)(i + 1u) / (int32_t)n;
+                uint32_t dw = (uint32_t)d >> 8, fr = (uint32_t)d & 255u;
+                int32_t in = b[2u * i + c], a, bb;
+                cb_buf[c][X.cbw & (CB_LEN - 1u)] = (int16_t)clip15(in);
+                a = cb_buf[c][(X.cbw - dw) & (CB_LEN - 1u)]; bb = cb_buf[c][(X.cbw - dw - 1u) & (CB_LEN - 1u)];
+                b[2u * i + c] = mix15(in, MUL15(a + (((bb - a) * (int32_t)fr) >> 8), g[c]), mix);
+            }
+            X.cbw++;
+        }
+        X.sp_d[0] = d1[0]; X.sp_d[1] = d1[1];
+        break;
+    }
+    case XF_REFLEX: {                           /* L and R: the same sweep, mirrored, a beat a cycle */
+        int32_t t = playing ? tri15(pos16_q8() * (0x1000000u / 4u)) : 0, base = x * 110 / 127 + 8;
+        svf_set(&X.f[0], SVF_G[clampi(base + t * 24 / 32768, 0, 120)], (uint32_t)y);
+        svf_set(&X.f[1], SVF_G[clampi(base - t * 24 / 32768, 0, 120)], (uint32_t)y);
+        for (i = 0; i < n; i++)
+            for (c = 0; c < 2u; c++) b[2u * i + c] = mix15(b[2u * i + c], soft15(svf_run(&X.f[c], b[2u * i + c], 0)), mix);
+        break;   /* (soft15: the resonance limited) */
+    }
+    case XF_PITCH: {                            /* two taps a half grain apart, each faded in and out (a triangle) */
+        int32_t g = 512 + x * 28, g16 = g << 16, step = 65536 - (int32_t)PS_R[(y * 25) >> 7];
+        uint32_t rcp = 0x80000000u / (uint32_t)g;   /* Q31 / g: the window's phase without a division */
+        for (i = 0; i < n; i++, X.rgw++) {
+            int32_t d2, w1, w2;
+            uint32_t f1, f2;
+            for (c = 0; c < 2u; c++) rp_buf[c][X.rgw & RG_MASK] = (int16_t)clip15(b[2u * i + c]);
+            X.ps_d += step;
+            if (X.ps_d < 0) X.ps_d += g16;
+            if (X.ps_d >= g16) X.ps_d -= g16;
+            if (X.ps_d < 0 || X.ps_d >= g16) X.ps_d = 0;   /* (X moved: a shorter grain) */
+            d2 = X.ps_d + (g16 >> 1); if (d2 >= g16) d2 -= g16;
+            f1 = (uint32_t)(((uint64_t)(uint32_t)X.ps_d * rcp) >> 31);   /* 0..65535 through the grain */
+            f2 = (uint32_t)(((uint64_t)(uint32_t)d2 * rcp) >> 31);
+            w1 = (int32_t)(f1 < 32768u ? f1 : 65536u - f1); w2 = (int32_t)(f2 < 32768u ? f2 : 65536u - f2);
+            for (c = 0; c < 2u; c++) {
+                uint32_t a1 = (uint32_t)X.ps_d >> 16, a2 = (uint32_t)d2 >> 16;
+                int32_t s1 = rp_buf[c][(X.rgw - a1) & RG_MASK], s1b = rp_buf[c][(X.rgw - a1 - 1u) & RG_MASK];
+                int32_t s2 = rp_buf[c][(X.rgw - a2) & RG_MASK], s2b = rp_buf[c][(X.rgw - a2 - 1u) & RG_MASK];
+                s1 += ((s1b - s1) * (int32_t)(((uint32_t)X.ps_d >> 8) & 255u)) >> 8;
+                s2 += ((s2b - s2) * (int32_t)(((uint32_t)d2 >> 8) & 255u)) >> 8;
+                b[2u * i + c] = mix15(b[2u * i + c], (s1 * w1 + s2 * w2) >> 15, mix);
+            }
+        }
+        break;
+    }
+    }
+}
+
 static void xfx(int32_t *b, uint32_t n)
 {
     uint32_t type = P.fx[FX_XTYPE], i, c;
@@ -72,7 +247,20 @@ static void xfx(int32_t *b, uint32_t n)
     if (modfx == 1u && !mod_now) mix = 0;       /* GATE: only on the mod lane's steps */
     if (modfx == 2u) mix = MUL15(mix, mod_now * 2184);   /* MIX: the mod value is the amount */
     if (modfx == 3u && mod_now) x = mod_now * 8;   /* X: the mod value moves X */
-    if (type >= NXF || type == XF_THRU || !mix) { X.rp_on = 0; return; }
+    if (type >= NXF || type == XF_THRU || !mix) {
+        X.rp_on = 0;
+        if (type == XF_SLICE || type == XF_FREEZE || type == XF_PITCH) {   /* (the ring keeps listening) */
+            if (type != X.type) { glitch_reset(); X.type = (uint8_t)type; }
+            X.fz_on = 0; X.sl_rev = 0; X.sl_idx = 0xFFFFFFFFu;
+            ring_rec(b, n);
+        }
+        return;
+    }
+    if (type >= XF_CHOP) {
+        if (type != X.type) { glitch_reset(); X.type = (uint8_t)type; X.cx = (uint8_t)x; X.cy = (uint8_t)y; }
+        glitch(b, n, type, x, y, mix);
+        return;
+    }
     if (type != X.type || x != X.cx || y != X.cy) {
         if (type == XF_LPF || type == XF_HPF || type == XF_BPF) {
             for (c = 0; c < 2u; c++) svf_set(&X.f[c], SVF_G[clampi(x, 0, 120)], (uint32_t)y);

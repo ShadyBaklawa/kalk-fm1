@@ -45,7 +45,8 @@ enum {
     FX_DFREQ, FX_DRES, FX_DFTYPE, FX_DLO,       /* reson delay: the filter in the loop (LP BP HP), low cut going in */
     FX_DLFO, FX_DDMOD, FX_DFM, FX_DINV,         /* its LFO (synced), on the time (tape), on the cutoff; feedback inverted */
 };
-enum { XF_THRU, XF_CRUSH, XF_BPF, XF_RING, XF_COMB, XF_REPEAT, XF_LPF, XF_HPF, XF_FOLD, XF_GATE, XF_PAN, XF_FLANGE, NXF };
+enum { XF_THRU, XF_CRUSH, XF_BPF, XF_RING, XF_COMB, XF_REPEAT, XF_LPF, XF_HPF, XF_FOLD, XF_GATE, XF_PAN, XF_FLANGE,
+       XF_CHOP, XF_SLICE, XF_FREEZE, XF_SPIN, XF_REFLEX, XF_PITCH, NXF };   /* (after 0.2: 0.2 has no type >= 12) */
 
 typedef struct {
     uint8_t main[NPAT][NMAIN][NSTEP];           /* steps of A-D: ST_ bits */

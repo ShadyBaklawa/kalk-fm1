@@ -1,0 +1,38 @@
+# KALK glitch XFX demo (step 4), at 124 BPM, the XFX page, XMIX full: two bars dry, then about two bars each of
+# CHOP (half of each 16th, then short), SLICE (pattern 7, then every 16th backwards), FREEZE (a 1/16 stutter,
+# 3/16, then the tape stops), SPIN (a turn a beat), REFLEX, PITCH (a fifth, an octave up, an octave down), THRU
+100 btn 12
+150 btn 2
+3900 enc 2 12
+4100 shot
+5800 enc 3 -15
+5810 enc 4 10
+7800 enc 2 1
+7810 enc 3 15
+8000 shot
+9700 enc 4 22
+9900 shot
+11600 enc 4 -21
+11610 enc 3 -17
+11650 enc 2 1
+12500 enc 3 17
+12600 shot
+13400 enc 3 10
+14300 enc 3 -10
+14310 enc 4 -21
+15300 enc 3 -17
+15310 enc 4 21
+15500 enc 3 17
+15510 enc 4 12
+15520 enc 2 1
+15800 shot
+19400 enc 2 1
+19600 shot
+23300 enc 2 1
+23500 shot
+25200 enc 4 9
+26100 enc 4 -42
+27000 shot
+28000 enc 2 -17
+29000 btn 12
+30500 end

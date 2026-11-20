@@ -131,7 +131,8 @@ static const char *const GL_NAMES[4] = {"BPM", "CHAN", "OUT", "SYNC"};
 
 static const char *const L_FILT[] = {"LP", "BP", "HP"};
 static const char *const L_MODD[] = {"OFF", "WAV", "PITCH", "DECAY", "CUT"};
-static const char *const L_XFX[NXF] = {"THRU", "CRUSH", "BPF", "RING", "COMB", "REPEAT", "LPF", "HPF", "FOLD", "GATE", "PAN", "FLANGE"};
+static const char *const L_XFX[NXF] = {"THRU", "CRUSH", "BPF", "RING", "COMB", "REPEAT", "LPF", "HPF", "FOLD", "GATE", "PAN", "FLANGE",
+                                          "CHOP", "SLICE", "FREEZE", "SPIN", "REFLEX", "PITCH"};
 static const char *const L_MOTION[] = {"OFF", "PLAY", "SMOOTH"};
 static const char *const L_MODFX[] = {"OFF", "GATE", "MIX", "X"};
 static const char *const L_OFFON[] = {"OFF", "ON"};
