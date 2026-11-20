@@ -347,10 +347,9 @@ CANDIDATES = [
 
 
 # ---------------------------------------------------------------- to the FM-1's format and back
-def finish(x, rate, max_s):
-    """what gen_samples.py does, then 8-bit mu-law and back: returns (audio at rate as heard, flash bytes)"""
-    x = np.asarray(x, float)
-    x = hp(x, 25, 1)                                # no DC (ring-mod and crush can leave some)
+def shape(x, rate, max_s):
+    """what gen_samples.py does: DC out, to the voice's rate, -1 dBFS, cut where it has died away, a 30 ms fade"""
+    x = hp(np.asarray(x, float), 25, 1)             # no DC (ring-mod and crush can leave some)
     g = gcd(rate, FS)
     x = resample_poly(x, rate // g, FS // g)
     x = x / (np.abs(x).max() or 1.0) * 0.89
@@ -361,8 +360,33 @@ def finish(x, rate, max_s):
     fade = min(n // 3, int(rate * 0.03))
     if fade:
         x[n - fade:] *= np.linspace(1, 0, fade) ** 2
+    return x
+
+
+def finish(x, rate, max_s):
+    """shape(), then 8-bit mu-law and back: returns (audio at rate as the FM-1 plays it, flash bytes)"""
+    x = shape(x, rate, max_s)
     t = np.array(mulaw_table(), float) / 32768.0
-    return t[mulaw(x)], n
+    return t[mulaw(x)], len(x)
+
+
+def render(name, cache=None):
+    """one candidate by name, shaped for its voice (not yet mu-law): [one-shot] or [closed, open] for a hat,
+    with the same seed as in the audition, so a pick sounds exactly as auditioned"""
+    global CACHE
+    if cache is not None:
+        CACHE = Path(cache)
+    for i, (voice, n, fn, _) in enumerate(CANDIDATES, 1):
+        if n == name:
+            res = fn(np.random.default_rng(1000 + i))
+            parts = res if voice == "HAT" else (res,)
+            maxs = MAXS[voice] if voice == "HAT" else (MAXS[voice],)
+            return voice, [shape(x, RATE[voice], m) for x, m in zip(parts, maxs)]
+    raise KeyError(f"no gen_vogel candidate {name!r}")
+
+
+def recipe(name):
+    return next(r for _, n, _, r in CANDIDATES if n == name)
 
 
 def main():

@@ -67,16 +67,18 @@ unaccented hit is), MOD> and MOD (where the mod lane goes: WAV, PITCH, DECAY or 
 
 | | |
 | --- | --- |
-| KICK | CAJON, FRAME, FRAME-M, BDRUM, CONCERT, TUMBA, LOW TOM, LOG LO |
-| SNARE | SNARE, SN OFF, RIMSHOT, X-STICK, ROPE, CLAPS, CLAP, SLAP |
-| HAT (closed / open) | HIHAT, HH SOFT, PEDAL, SHAKER, TAMB, CABASA, SLEIGH, CYMBAL |
-| TIE (pitched by its steps, glides) | LOG HI, COWBELL, COWBL 2, AGOGO, WOOD, CONGA, BONGO, HI TOM |
-| POD (ZAP bends them) | CLAVES, TRIANGL, BRAKE, QUINTO, VIBRSLP, BONGO L, AGOGO L, TRI MUT |
+| KICK | FMTHUD, RINGKIK, CRSHKIK, COMBKIK, BDRUM, FRAME-M, TUMBA, LOG LO |
+| SNARE | RINGSN, GRANSN, CRSHSN, COMBSN, GLTCHCL, SNARE, RIMSHOT, CLAP |
+| HAT (closed / open) | FMHAT, TICKHAT, COMBHAT, GRANHAT, RINGHAT, HIHAT, SHAKER, TAMB |
+| TIE (pitched by its steps, glides) | FMPING, RINGPNG, KARPLUS, GRANBEL, CRSHPNG, COWBELL, WOOD, CONGA |
+| POD (ZAP bends them) | ZAPFM, COMBCLK, GLASS, GRANWOD, BITBLIP, CLAVES, BRAKE, TRIANGL |
 
 A sample plays through the voice's filter, SAT, pitch and envelope: DECAY holds it for half its time, then releases
-(Limelite's hold and release); START skips into it. CC0 1.0, from [VCSL](https://github.com/sgossner/VCSL) by
-Versilian Studios: `assets/samples-cc0/ATTRIBUTION.txt`. `tools/gen_samples.py` rebuilds the banks (8-bit mu-law, in
-the app's flash).
+(Limelite's hold and release); START skips into it. The first ones in each row are synthesised here by
+`tools/gen_vogel.py` (FM and ring-mod pings, bitcrushed ticks, comb clicks, granular smears); the rest are recordings
+from [VCSL](https://github.com/sgossner/VCSL) by Versilian Studios. All CC0 1.0: `assets/samples-cc0/ATTRIBUTION.txt`.
+`tools/gen_samples.py` rebuilds the banks (8-bit mu-law, in the app's flash); `python3 tools/gen_vogel.py` renders
+the synthesised candidates to `build/vogel/` to audition.
 
 ## The sequence
 

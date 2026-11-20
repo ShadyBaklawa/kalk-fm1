@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""KALK: the sample banks. Fetches CC0 one-shots from Versilian Studios' VCSL (https://github.com/sgossner/VCSL,
-CC0 1.0), trims, normalises, fades and resamples them, and writes them as 8-bit mu-law into
+"""KALK: the sample banks. Vogel-style one-shots rendered by tools/gen_vogel.py (ours, CC0), and CC0 one-shots fetched
+from Versilian Studios' VCSL (https://github.com/sgossner/VCSL, CC0 1.0), trimmed, normalised, faded and resampled;
+all written as 8-bit mu-law into
 firmware/src/kalk_samples.h (in the app's flash: no RAM), with assets/samples-cc0/ATTRIBUTION.txt.
 
   python3 tools/gen_samples.py [CACHE_DIR]      (downloads go to CACHE_DIR, default /tmp/kalk-vcsl)
 
-Eight samples per voice: WAV 17..24. The hat has pairs: the closed step plays the first, the open step the second.
+Eight samples per voice: WAV 17..24 (the gen_vogel ones first). A path "vogel:NAME" is a gen_vogel candidate. The hat has pairs: the closed step plays the first, the open step the second.
 """
 import io
 import sys
@@ -26,56 +27,58 @@ ID = "Idiophones/Struck Idiophones/"
 MB = "Membranophones/Struck Membranophones/"
 
 # voice: (rate, max seconds, [(name, path), ...]); hat: (rate, closed s, open s, [(name, closed, open), ...])
+V = "vogel:"   # rendered by tools/gen_vogel.py (ours, CC0), not fetched
+
 BANKS = {
     "KICK": (22050, 0.40, [
-        ("CAJON", ID + "Cajon/Cajon_hit1_fff_rr1.wav"),
-        ("FRAME", MB + "Frame Drum/HDrumL_Hit_v3_rr1_Sum.wav"),
-        ("FRAME-M", MB + "Frame Drum/HDrumL_HitMuted_v3_rr1_Sum.wav"),
+        ("FMTHUD", V + "FMTHUD"),
+        ("RINGKIK", V + "RINGKIK"),
+        ("CRSHKIK", V + "CRSHKIK"),
+        ("COMBKIK", V + "COMBKIK"),
         ("BDRUM", MB + "Bass Drum 1/BDrumNew_hit_v7_rr1_Sum.wav"),
-        ("CONCERT", MB + "Bass Drum 2/bassdrum_hit_ff.wav"),
+        ("FRAME-M", MB + "Frame Drum/HDrumL_HitMuted_v3_rr1_Sum.wav"),
         ("TUMBA", MB + "Conga/Tumba_HitFM_v3_rr1_Sum.wav"),
-        ("LOW TOM", MB + "Tom 2/Stick/TomL_HitS_v4_rr1_Mid.wav"),
         ("LOG LO", ID + "Slit Drum/LogDrumLo_MedM_v3_rr1_Sum.wav"),
     ]),
     "SNARE": (32000, 0.32, [
+        ("RINGSN", V + "RINGSN"),
+        ("GRANSN", V + "GRANSN"),
+        ("CRSHSN", V + "CRSHSN"),
+        ("COMBSN", V + "COMBSN"),
+        ("GLTCHCL", V + "GLTCHCL"),
         ("SNARE", MB + "Snare Drum, Modern 1/Snare2_HitSN_v9_rr1_Mid.wav"),
-        ("SN OFF", MB + "Snare Drum, Modern 1/Snare2_HitNS_v6_rr1_Mid.wav"),
         ("RIMSHOT", MB + "Snare Drum, Modern 3/Snare4_rimshot_v4_rr1_Mid.wav"),
-        ("X-STICK", MB + "Snare Drum, Modern 3/Snare4_Xstick_v2_rr1_Mid.wav"),
-        ("ROPE", MB + "Snare Drum, Rope Tension/RopeSnare_stick_Main_vl1_rr1.wav"),
-        ("CLAPS", ID + "Claps/Clap_rr1.wav"),
         ("CLAP", ID + "Claps/SoloClap_vl4.wav"),
-        ("SLAP", ID + "Cajon/Cajon_hit3_f_rr1.wav"),
     ]),
     "HAT": (32000, 0.15, 0.40, [
+        ("FMHAT", V + "FMHAT", V + "FMHAT"),
+        ("TICKHAT", V + "TICKHAT", V + "TICKHAT"),
+        ("COMBHAT", V + "COMBHAT", V + "COMBHAT"),
+        ("GRANHAT", V + "GRANHAT", V + "GRANHAT"),
+        ("RINGHAT", V + "RINGHAT", V + "RINGHAT"),
         ("HIHAT", ID + "Hi-Hat Cymbal/HiHat_HitC_v4_rr1_Mid.wav", ID + "Hi-Hat Cymbal/HiHat_HitO_rr1_Mid.wav"),
-        ("HH SOFT", ID + "Hi-Hat Cymbal/HiHat_HitC_v2_rr1_Mid.wav", ID + "Hi-Hat Cymbal/HiHat_HitOC_rr5_Mid.wav"),
-        ("PEDAL", ID + "Hi-Hat Cymbal/HiHat_Close_rr1_Mid.wav", ID + "Hi-Hat Cymbal/HiHat_HitLoose_rr1_Mid.wav"),
         ("SHAKER", ID + "Shaker, Small/Mid_ShakerDouble_Down_rr1.wav", ID + "Shaker, Small/Mid_Shaker_Roll_Fast_rr1.wav"),
         ("TAMB", ID + "Tambourine 1/Tamb1_Hit_v2_rr1_Mid.wav", ID + "Tambourine 1/Tamb1_Shake_rr1_Mid.wav"),
-        ("CABASA", ID + "Cabasa/Cabasa1_Hit_rr1_Mid.wav", ID + "Cabasa/Cabasa1_Rub_v2_rr1_Mid.wav"),
-        ("SLEIGH", ID + "Sleigh Bells/Sleighbells_Hit_rr1_Mid.wav", ID + "Sleigh Bells/sleighbell2_shake1.wav"),
-        ("CYMBAL", ID + "Suspended Cymbal 1/susCymb1_hit_stick_mp1.wav", ID + "Suspended Cymbal 1/susCymb1_hit_stick_f1.wav"),
     ]),
     "TIE": (32000, 0.30, [
-        ("LOG HI", ID + "Slit Drum/LogDrumHi_MedM_v3_rr1_Sum.wav"),
+        ("FMPING", V + "FMPING"),
+        ("RINGPNG", V + "RINGPNG"),
+        ("KARPLUS", V + "KARPLUS"),
+        ("GRANBEL", V + "GRANBEL"),
+        ("CRSHPNG", V + "CRSHPNG"),
         ("COWBELL", ID + "Cowbells/Cowbell1_Normal_v3_rr1_Mid.wav"),
-        ("COWBL 2", ID + "Cowbells/Cowbell2_Normal_v3_rr1_Mid.wav"),
-        ("AGOGO", ID + "Agogo Bells/Agogo_High_v2_rr1_Mid.wav"),
         ("WOOD", ID + "Woodblock/wood_click_f_rr1.wav"),
         ("CONGA", MB + "Conga/Conga_HitN_v3_rr1_Sum.wav"),
-        ("BONGO", MB + "Bongos/BongoH_Hit1_v3_rr1_Mid.wav"),
-        ("HI TOM", MB + "Tom 1/Stick/TomH_HitS_v4_rr1_Mid.wav"),
     ]),
     "POD": (32000, 0.30, [
+        ("ZAPFM", V + "ZAPFM"),
+        ("COMBCLK", V + "COMBCLK"),
+        ("GLASS", V + "GLASS"),
+        ("GRANWOD", V + "GRANWOD"),
+        ("BITBLIP", V + "BITBLIP"),
         ("CLAVES", ID + "Claves/Claves1_Hit_v2_rr1_Mid.wav"),
-        ("TRIANGL", ID + "Triangles/Legacy/1/triangle1_hit_mp.wav"),
         ("BRAKE", ID + "Brake Drum/BrakeDrum1_Hammer_v3_rr1_Mid.wav"),
-        ("QUINTO", MB + "Conga/Quinto_HitFM1_v2_rr1_Sum.wav"),
-        ("VIBRSLP", ID + "Vibraslap/Legacy/vibraslap_rr1.wav"),
-        ("BONGO L", MB + "Bongos/BongoL_Hit1_v3_rr1_Mid.wav"),
-        ("AGOGO L", ID + "Agogo Bells/Agogo_Low_v2_rr1_Mid.wav"),
-        ("TRI MUT", ID + "Triangles/Legacy/1/triangle1_hit_mp_muted1.wav"),
+        ("TRIANGL", ID + "Triangles/Legacy/1/triangle1_hit_mp.wav"),
     ]),
 }
 
@@ -150,23 +153,32 @@ def main():
         b = BANKS[voice]
         if voice == "HAT":
             rate, cs, os_, picks = b
-            items = [(n, p, cs) for n, pc, po in picks for p in [pc]] + [(n, po, os_) for n, pc, po in picks]
+            items = [(n, pc, cs, 0) for n, pc, po in picks] + [(n, po, os_, 1) for n, pc, po in picks]
         else:
             rate, ms, picks = b
-            items = [(n, p, ms) for n, p in picks]
-        for name, path, max_s in items:
-            d, r = load(fetch(path, cache))
-            x = prepare(d, r, rate, max_s)
+            items = [(n, p, ms, 0) for n, p in picks]
+        for name, path, max_s, part in items:
+            if path.startswith(V):
+                import gen_vogel
+                vv, parts = gen_vogel.render(path[len(V):], cache)
+                assert vv == voice, f"{path} is a {vv} candidate, not {voice}"
+                x = parts[part]
+            else:
+                d, r = load(fetch(path, cache))
+                x = prepare(d, r, rate, max_s)
             off = sum(len(c) for c in blob)
             blob.append(bytes(mulaw(x).astype(np.uint8)))
             step = round(rate / 44100 * 65536)
             entries.append((voice, name, off, len(x), step))
-            credits.append(f"{voice:5} {name:8} {len(x) / rate * 1000:4.0f} ms  <-  sgossner/VCSL: {path}")
+            src = (f"tools/gen_vogel.py {path[len(V):]}: {gen_vogel.recipe(path[len(V):])}" if path.startswith(V)
+                   else f"sgossner/VCSL: {path}")
+            credits.append(f"{voice:5} {name:8} {len(x) / rate * 1000:4.0f} ms  <-  {src}")
             print(credits[-1])
     data = b"".join(blob)
     lines = ["/* SPDX-License-Identifier: CC0-1.0 (the samples); the header layout GPL-3.0-only */",
-             "/* KALK's sample banks: written by tools/gen_samples.py, do not edit. 8-bit mu-law, from Versilian",
-             " * Studios' VCSL (CC0 1.0, https://github.com/sgossner/VCSL); assets/samples-cc0/ATTRIBUTION.txt */",
+             "/* KALK's sample banks: written by tools/gen_samples.py, do not edit. 8-bit mu-law: rendered by",
+             " * tools/gen_vogel.py (CC0), and from Versilian Studios' VCSL (CC0 1.0, https://github.com/sgossner/VCSL);",
+             " * assets/samples-cc0/ATTRIBUTION.txt */",
              "#pragma once", "#include <stdint.h>", "",
              "typedef struct { uint32_t off, len; uint16_t step; char name[8]; } ksmp_t;   /* step: rate / 44100, Q16 */",
              "#define NSMP 8u", "",
@@ -194,7 +206,10 @@ def main():
     ATTR.write_text("KALK sample banks - source material\n"
                     "Licence: CC0 1.0 Universal (public domain dedication)\n"
                     "  https://creativecommons.org/publicdomain/zero/1.0/\n"
-                    "Source: Versilian Studios (Sam Gossner), VCSL  https://github.com/sgossner/VCSL  (CC0-1.0)\n"
+                    "Sources:\n"
+                    "  - tools/gen_vogel.py: synthesised in this repository (FM, ring-mod, crush, comb, Karplus-Strong),\n"
+                    "    some from grains of VCSL recordings; dedicated to the public domain under CC0 1.0.\n"
+                    "  - Versilian Studios (Sam Gossner), VCSL  https://github.com/sgossner/VCSL  (CC0-1.0)\n"
                     "Processed by tools/gen_samples.py: trimmed, normalised, faded, resampled, 8-bit mu-law.\n\n" +
                     "\n".join(credits) + "\n")
     print(f"{len(entries)} samples, {len(data)} bytes -> {OUT}")
