@@ -104,7 +104,7 @@ enum { SQ_LEN, SQ_START, SQ_SWING, SQ_HALF, SQ_TLEN, SQ_PLEN, SQ_MLEN, SQ_STRETC
        SQ_GSMOOTH, NSQ };
 enum { GL_BPM, GL_CH, GL_OUT, GL_SYNC };
 enum { SL_LEN, SL_STRETCH };
-enum { F_WAV, F_NUM, F_SEMI, F_MS, F_HZ, F_LIST, F_PAN, F_BIP, F_PLUS1, F_PCT, F_TICKS, F_MASK3, F_CHAIN, F_PAT, F_OMNI, F_LEN, F_RT, F_SPEED, F_GMS, F_OFFN, F_FMS };
+enum { F_WAV, F_NUM, F_SEMI, F_MS, F_HZ, F_LIST, F_PAN, F_BIP, F_PLUS1, F_PCT, F_TICKS, F_MASK3, F_CHAIN, F_PAT, F_OMNI, F_LEN, F_RT, F_SPEED, F_GMS, F_OFFN, F_FMS, F_AUTOMS };
 typedef struct { uint8_t kind, idx; } pref_t;
 
 static const char *const LANE_LONG[NLANE] = {"KICK", "SNARE", "HAT", "TIE", "POD", "MOD"};
@@ -141,6 +141,7 @@ static const char *const L_OFFON[] = {"OFF", "ON"};
 static const char *const L_R2RATE[] = {"1/4 BAR", "1/2 BAR", "1 BAR", "2 BAR", "4 BAR", "8 BAR"};
 static const char *const L_R2SHAPE[NR2] = {"SINE", "TRI", "SAW UP", "SAW DN", "SQUARE", "RANDOM", "DRUNK"};
 static const char *const L_GMODE[] = {"OFF", "PRE FX", "POST FX"};
+static const char *const L_HATMODE[] = {"NOISE", "808"};
 static const char *const L_BSRC[] = {"MIX", "KICK", "K+SN", "DRUMS"};
 static const char *const F2_NAMES[NFX2] = {"BEAT", "ATTACK", "RELEAS", "SOURCE", "LEVEL", "LO", "HI", "DECAY",
                                            "WAVE", "TRIG", "GLIDE", "PAN", "", "", "", ""};
@@ -162,7 +163,7 @@ static const pref_t PG_VOICE[4][4] = {
 };
 static const char *const PG_VOICE_T[5] = {"SOUND", "FILTER", "SHAPE", "MOD", "LANE"};
 /* the EXTRA page (after 0.3): which voices have one yet, its title and its names */
-static const uint8_t VX_ON[NVOICE] = {1, 1, 0, 0, 0};
+static const uint8_t VX_ON[NVOICE] = {1, 1, 1, 1, 0};
 static const char *const VX_T[NVOICE] = {"GRAIN", "GRAIN", "808", "FM ENV", ""};
 static const pref_t PG_VX[4] = {{K_VX, 0}, {K_VX, 1}, {K_VX, 2}, {K_VX, 3}};
 static const char *const VX_NAMES[NVOICE][4] = {
@@ -327,6 +328,13 @@ static pval_t pval(pref_t r)
         if (!v.name[0]) break;                  /* (no parameter here) */
         v.p = &P.vx[vi][r.idx];
         if (vi <= 1u) v.fmt = r.idx == VX_GRAIN ? F_OFFN : r.idx == VX_SPEED ? F_SPEED : F_GMS;
+        else if (vi == 2u) {                    /* hat */
+            if (r.idx == VX_808) { v.max = 1; v.fmt = F_LIST; v.list = L_HATMODE; }
+            else if (r.idx == VX_TONE) v.fmt = F_BIP;
+        } else if (vi == 3u) {                  /* tie */
+            if (r.idx == VX_FMD) v.fmt = F_AUTOMS;
+            else if (r.idx != VX_DROP) v.fmt = F_OFFN;
+        }
         break;
     }
     case K_F2:
@@ -419,6 +427,12 @@ static void fmt_val(const pval_t *v, char *d)
     case F_SPEED: d = put_u(d, (uint32_t)x * 100u / 64u); put_s(d, "%"); break;   /* 64: 100 % */
     case F_GMS: d = put_u(d, (220u + (uint32_t)x * 28u) / 44u); put_s(d, "ms"); break;
     case F_FMS: d = put_u(d, follow_ms(x)); put_s(d, "ms"); break;   /* FOLLOW's attack / release */
+    case F_AUTOMS:                              /* 0: as the voice's DECAY has it */
+        if (!x) { put_s(d, "AUTO"); break; }
+        { uint32_t ms = DECAY_MS[x & 127];
+          if (ms >= 1000u) { d = put_u(d, ms / 1000u); *d++ = '.'; d = put_u(d, ms / 100u % 10u); put_s(d, "s"); }
+          else { d = put_u(d, ms); put_s(d, "ms"); } }
+        break;
     case F_OFFN: if (!x) put_s(d, "OFF"); else put_u(d, (uint32_t)x); break;
     default:
         if (v->p == &P.remix && !x) put_s(d, "OFF");

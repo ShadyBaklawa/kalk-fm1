@@ -3,6 +3,10 @@
  * choke each other), TIE (a two-operator FM tone with glide) and POD (a tone whose pitch is struck by a decay
  * envelope: Limelite's idea of a decay as the FM source). WAV picks one of 16 variants of each.
  *
+ * After 0.3, each voice's EXTRA page: the kick's and snare's GRAIN; the hat's 808 mode (its six squares through two
+ * band passes, ~3.4 and ~7.1 kHz, TONE moves them, COLOR between them, SNAP a sharper start); the tie's FM ENV
+ * (an attack and its own decay for the FM, a pitch DROP, noise into the modulator): a richer FM drum.
+ *
  * Runs in the audio interrupt: voice_trigger() at a step, voice_render() every block. Reads P.vp (bytes the main
  * loop writes: each read is atomic). */
 
@@ -29,6 +33,11 @@ typedef struct {
     /* GRAIN (kick, snare samples): two grains a half apart; spos is the head, moving at SPEED */
     uint8_t grn;                                /* on */
     uint32_t gp[2], gph[2], glen, grcp, gjit, gspd;   /* grain read points (Q16), phases, length, Q31/len, jitter, head step */
+    /* (after 0.3) the hat's 808 mode: two band passes, their balance, the snap; the tie's FM ENV */
+    uint8_t h808;
+    svf_t hb[2]; int32_t hmix, snap; uint32_t senv;
+    uint32_t fatt;                              /* tie: the FM envelope's attack step (0: it starts open) */
+    int32_t fnz;                                /* tie: noise into the modulator, Q15 */
 } voice_t;
 static voice_t V[NV_RUN];
 static volatile int8_t mod_now;                /* the mod lane's value now (0..15) */
@@ -173,6 +182,19 @@ static void voice_trigger(uint32_t vi, uint32_t acc, int32_t semi, int32_t vel)
         if (vi == V_HATO) v->ek = decay_k(p[VP_X1]);   /* X1: OPEN decay */
         if (p[VP_X2] && vi == V_HATC) V[V_HATO].ek = decay_k(0);   /* X2: LINK: the closed hat chokes the open */
         if (p[VP_X2] && vi == V_HATO) V[V_HATC].ek = decay_k(0);
+        {                                       /* (after 0.3) 808 mode: the squares through two band passes */
+            const uint8_t *x = P.vx[2];
+            v->h808 = x[VX_808] ? 1u : 0u;
+            if (v->h808) {
+                int32_t sh = ((int32_t)x[VX_TONE] - 64) / 4;   /* TONE: +-16 table steps, about +-1.3 octaves */
+                svf_set(&v->hb[0], SVF_G[clampi(95 + sh, 0, 120)], 50);   /* ~3.4 kHz */
+                svf_set(&v->hb[1], SVF_G[clampi(109 + sh, 0, 120)], 50);  /* ~7.1 kHz */
+                svf_reset(&v->hb[0]); svf_reset(&v->hb[1]);
+                v->hmix = (int32_t)x[VX_COLOR] * 258;   /* COLOR: 0 the low band .. 127 the high */
+                v->snap = (int32_t)x[VX_SNAP] * 258;
+                v->senv = ENV_ONE;
+            }
+        }
         break;
     }
     case V_TIE: {
@@ -192,6 +214,16 @@ static void voice_trigger(uint32_t vi, uint32_t acc, int32_t semi, int32_t vel)
         v->pk = decay_k(dec - 12);
         v->nmix = (int32_t)p[VP_START] * 120;   /* tie: START is the NOISE in it */
         if (!was_on) v->ph = v->ph2 = 0;
+        {                                       /* (after 0.3) FM ENV: all 0 is the tie as it was */
+            const uint8_t *x = P.vx[3];
+            v->fatt = x[VX_FMA] ? ENV_ONE / ((uint32_t)x[VX_FMA] * 88u) : 0u;   /* up to ~250 ms */
+            if (v->fatt) v->penv = 0;
+            if (x[VX_FMD]) v->pk = decay_k(x[VX_FMD]);
+            v->sweep = (uint32_t)(((uint64_t)v->inc * x[VX_DROP]) >> 4);   /* DROP: up to ~8x (3 octaves) above */
+            v->nenv = ENV_ONE;
+            v->nk = decay_k(x[VX_FMD] ? x[VX_FMD] / 2 : 20);
+            v->fnz = (int32_t)x[VX_FMNZ] * 258;
+        }
         break;
     }
     case V_POD: {
@@ -310,8 +342,32 @@ static void render_snare(voice_t *v, int32_t *out, uint32_t n)
     }
 }
 
+static void render_hat808(voice_t *v, int32_t *out, uint32_t n)   /* (after 0.3) */
+{
+    uint32_t i, k;
+    int32_t nm = v->nmix * 258, mm = 32767 - nm;
+    for (i = 0; i < n; i++) {
+        int32_t metal = 0, s, lo, hi;
+        if (!env_step(v)) { v->on = 0; return; }
+        for (k = 0; k < 6u; k++) {
+            v->hph[k] += v->hinc[k];
+            metal += (int32_t)(v->hph[k] >> 31) ? 5461 : -5461;
+        }
+        s = MUL15(metal, mm) + MUL15(noise15() * 2, nm);
+        lo = svf_run(&v->hb[0], s, 1);
+        hi = svf_run(&v->hb[1], s, 1);
+        s = (lo + MUL15(hi - lo, v->hmix)) * 2;    /* (the band passes take a lot away: back up) */
+        if (v->snap) {                          /* SNAP: a few ms louder at the start */
+            s += MUL15(MUL15(s, v->snap), (int32_t)(v->senv >> 15)) * 2;
+            v->senv = env_dec(v->senv, DECAY_K[4]);
+        }
+        voice_out(v, out, i, MUL15(clip15(s), (int32_t)(v->env >> 15)));
+    }
+}
+
 static void render_hat(voice_t *v, int32_t *out, uint32_t n)
 {
+    if (v->h808) { render_hat808(v, out, n); return; }
     uint32_t i, k;
     int32_t nm = v->nmix * 258, mm = 32767 - nm;
     for (i = 0; i < n; i++) {
@@ -337,13 +393,21 @@ static void render_tie(voice_t *v, int32_t *out, uint32_t n)
             v->inc2 = (uint32_t)(((uint64_t)v->inc * v->ratio) >> 4);
         }
         if (!env_step(v)) { v->on = 0; return; }
-        v->penv = env_dec(v->penv, v->pk);
+        if (v->fatt) {                          /* (after 0.3) FM ATK: the FM comes in */
+            if (v->penv < ENV_ONE - v->fatt) v->penv += v->fatt;
+            else { v->penv = ENV_ONE; v->fatt = 0; }
+        } else v->penv = env_dec(v->penv, v->pk);
         e15 = (int32_t)(v->env >> 15);
         v->ph2 += v->inc2;
         m = sin15(v->ph2 + ((uint32_t)(v->last * v->fb) << 5));
         v->last = m >> 4;
+        if (v->fnz) m += MUL15(noise15() * 2, v->fnz);   /* NOISFM: the modulator gets noisy */
         depth = MUL15(v->fm, (int32_t)(v->penv >> 15));
         v->ph += v->inc;
+        if (v->sweep) {                         /* DROP: from above, down to the note */
+            v->nenv = env_dec(v->nenv, v->nk);
+            v->ph += (uint32_t)(((uint64_t)v->sweep * v->nenv) >> 30);
+        }
         s = sin15(v->ph + ((uint32_t)(m * depth) << 2));
         if (v->shape == 1u) s = drive15(s, 900);
         else if (v->shape == 2u) s = (s + tri15(v->ph)) >> 1;

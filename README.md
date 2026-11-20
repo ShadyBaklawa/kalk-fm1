@@ -85,6 +85,8 @@ the synthesised candidates to `build/vogel/` to audition.
 | | K1 | K2 | K3 | K4 |
 | --- | --- | --- | --- | --- |
 | **KICK**, **SNARE**: GRAIN (on the samples) | GRAIN: each grain starts up to ~200 ms further on (OFF: none) | SPEED: how fast the sample goes by, 0-198 % (100 %: as recorded); the pitch stays | SIZE: the grains, 5-86 ms | |
+| **HAT**: 808 (on the synth hats) | 808: NOISE (as before) or 808: the six squares through two band passes, ~3.4 and ~7.1 kHz | TONE: moves both, about +-1.3 octaves | COLOR: from the low band to the high | SNAP: a sharper start |
+| **TIE**: FM ENV (a richer FM drum) | FM ATK: the FM fades in (OFF: struck) | FM DEC: the FM's own decay (AUTO: from DECAY) | DROP: starts up to 3 octaves above and falls to the note | NOISFM: noise into the modulator |
 
 At GRAIN OFF and SPEED 100 % the sample plays as before. A project saved by 0.2 or 0.3 loads with the EXTRA pages at rest.
 

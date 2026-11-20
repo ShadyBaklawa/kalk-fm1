@@ -1,0 +1,31 @@
+# KALK 808 hat + FM drum demo (step 8), 124 BPM: two bars as they are; the hat's EXTRA page: 808 mode; brighter and
+# with SNAP; then the tie's FM ENV: a pitch DROP and its own FM decay (an FM tom); FM ATK and noise in the FM; back
+100 btn 12
+3900 keys 0x20
+3950 keys 0
+4000 enc 0 -1
+4010 enc 2 1
+4200 shot
+7800 enc 3 6
+7810 enc 5 20
+8000 shot
+11700 keys 0x100
+11750 keys 0
+11800 enc 0 1
+11810 enc 4 15
+11820 enc 3 12
+12000 shot
+15600 enc 2 10
+15610 enc 5 8
+15800 shot
+19500 enc 2 -10
+19510 enc 3 -12
+19520 enc 4 -15
+19530 enc 5 -8
+19540 keys 0x20
+19550 keys 0
+19560 enc 0 -1
+19570 enc 2 -1
+19700 shot
+21400 btn 12
+23000 end

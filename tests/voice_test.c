@@ -112,5 +112,78 @@ int main(void)
             memcpy(P.vp, VP_DEFAULT, sizeof VP_DEFAULT); memcpy(P.vx, VX_DEFAULT, sizeof VX_DEFAULT);
         }
     }
+
+    /* (after 0.3) the hat's 808 mode and the tie's FM ENV: every variant still sounds, stays under full scale and
+     * ends with them all the way up; 808 takes the lows away and TONE moves it; DROP starts the tie high; FM ATK
+     * starts it plain */
+    {
+        uint32_t i, var, vi, bad = 0;
+        double low808 = 0, lownoise = 0, cen[2] = {0, 0};
+        P.vx[2][VX_808] = 1; P.vx[2][VX_COLOR] = 64; P.vx[2][VX_SNAP] = 127;
+        P.vx[3][VX_FMA] = 127; P.vx[3][VX_FMD] = 127; P.vx[3][VX_DROP] = 127; P.vx[3][VX_FMNZ] = 127;
+        for (vi = V_HATC; vi <= V_TIE; vi++)
+            for (var = 0; var < 24u; var++) {
+                double pk = 0;
+                P.vp[V_PARAMS[vi]][VP_WAV] = (uint8_t)var;
+                memset(buf, 0, sizeof buf); memset(&V[vi], 0, sizeof V[vi]);
+                voice_trigger(vi, 1, 0, 32767);
+                for (i = 0; i < N; i += 32u) voices_render(buf + 2u * i, 32u);
+                for (i = 0; i < N; i++) { double s = fabs((double)buf[2u * i] + buf[2u * i + 1u]) / 65536.0; if (s > pk) pk = s; }
+                if (pk < 0.02 || pk > 0.99 || V[vi].on) { bad++; printf("FAIL %s WAV %u with the EXTRA page up: peak %.2f%s\n", NAME[vi], var + 1, pk, V[vi].on ? ", never ends" : ""); }
+            }
+        printf("808 hats and FM ENV ties (every variant, all the way up): %u failed\n", bad);
+        fails += bad;
+        memcpy(P.vp, VP_DEFAULT, sizeof VP_DEFAULT);
+        /* the lows: a one-pole low pass at ~1 kHz of the closed hat, 808 against NOISE mode; TONE's centroid */
+        for (var = 0; var < 2u; var++) {
+            double lp = 0, el = 0, et = 0;
+            P.vx[2][VX_808] = (uint8_t)var; P.vx[2][VX_TONE] = 64;
+            P.vp[2][VP_FTYPE] = 0; P.vp[2][VP_CUT] = 127; P.vp[2][VP_RES] = 0;   /* (the voice's own filter out of the way) */
+            memset(buf, 0, sizeof buf); memset(&V[V_HATC], 0, sizeof V[V_HATC]);
+            voice_trigger(V_HATC, 1, 0, 32767);
+            for (i = 0; i < FS / 5; i += 32u) voices_render(buf + 2u * i, 32u);
+            for (i = 0; i < FS / 5; i++) { double x = buf[2u * i]; lp += (x - lp) * 0.14; el += lp * lp; et += x * x; }
+            if (var) low808 = el / et; else lownoise = el / et;
+        }
+        for (var = 0; var < 2u; var++) {
+            double zc = 0, last = 0;
+            P.vx[2][VX_808] = 1; P.vx[2][VX_TONE] = var ? 127 : 0;
+            memset(buf, 0, sizeof buf); memset(&V[V_HATC], 0, sizeof V[V_HATC]);
+            voice_trigger(V_HATC, 1, 0, 32767);
+            for (i = 0; i < FS / 10; i += 32u) voices_render(buf + 2u * i, 32u);
+            for (i = 0; i < FS / 20; i++) { double x = buf[2u * i]; if ((x > 0) != (last > 0)) zc++; last = x; }
+            cen[var] = zc * 10;                 /* (crossings a second / 2: about the frequency) */
+        }
+        printf("HAT 808: energy under ~1 kHz %.3f of it (NOISE mode %.3f); TONE -64 / +63: about %.0f / %.0f Hz\n", low808, lownoise, cen[0], cen[1]);
+        if (!(low808 < lownoise / 3)) { printf("FAIL 808: the lows\n"); fails++; }
+        if (!(cen[1] > cen[0] * 1.6)) { printf("FAIL 808: TONE\n"); fails++; }
+        memcpy(P.vx, VX_DEFAULT, sizeof VX_DEFAULT);
+        /* the tie (SYN 1): DROP's start against its tail; FM ATK's start against no attack */
+        {
+            double z[4];
+            uint32_t m;
+            P.vp[3][VP_WAV] = 0; P.vp[3][VP_X1] = 90;
+            for (m = 0; m < 4u; m++) {
+                double zc0 = 0, zc1 = 0, last = 0;
+                memcpy(P.vx, VX_DEFAULT, sizeof VX_DEFAULT);
+                P.vp[3][VP_X1] = m < 2u ? 0 : 90;   /* (DROP: a plain sine; FM ATK: with FM) */
+                if (m == 1u) P.vx[3][VX_DROP] = 64;
+                if (m == 3u) P.vx[3][VX_FMA] = 60;
+                memset(buf, 0, sizeof buf); memset(&V[V_TIE], 0, sizeof V[V_TIE]);
+                voice_trigger(V_TIE, 1, 0, 32767);
+                for (i = 0; i < FS / 5; i += 32u) voices_render(buf + 2u * i, 32u);
+                for (i = 0; i < FS / 5; i++) {
+                    double x = buf[2u * i];
+                    if ((x > 0) != (last > 0)) { if (i < FS / 100) zc0++; else if (i >= FS / 10 && i < FS / 10 + FS / 100) zc1++; }
+                    last = x;
+                }
+                z[m] = zc0; (void)zc1;
+            }
+            printf("TIE: zero crossings in the first 10 ms: plain %.0f, DROP %.0f; with FM: plain %.0f, FM ATK %.0f\n", z[0], z[1], z[2], z[3]);
+            if (!(z[1] > z[0] * 1.5)) { printf("FAIL TIE DROP\n"); fails++; }
+            if (!(z[3] < z[2])) { printf("FAIL TIE FM ATK\n"); fails++; }
+            memcpy(P.vp, VP_DEFAULT, sizeof VP_DEFAULT); memcpy(P.vx, VX_DEFAULT, sizeof VX_DEFAULT);
+        }
+    }
     return fails ? 1 : 0;
 }
