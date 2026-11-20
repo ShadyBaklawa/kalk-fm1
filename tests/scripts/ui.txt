@@ -1,0 +1,69 @@
+# the panel: steps, accent, step values, stretch, chain, copy, mute, open hat, XFX motion, save / clear / load
+100 keys 0x8
+200 keys 0
+300 keys 0x4
+400 keys 0
+500 keys 0x10
+1000 keys 0
+1100 shot
+1200 keys 0x100
+1250 keys 0
+1300 keys 0x4
+1400 enc 2 5
+1600 keys 0
+1650 shot
+1800 btn 11
+1900 btn 11
+2000 enc 5 4
+2100 shot
+2200 btn 11
+2300 enc 2 1
+2310 enc 2 1
+2320 enc 2 1
+2400 shot
+2600 keys 0x8000
+2700 keys 0x408000
+2800 keys 0x8000
+2900 keys 0
+3000 shot
+3100 keys 0x2
+3150 keys 0
+3200 btn 4
+3300 shot
+3400 btn 12
+5000 shot
+5100 keys 0x20
+5150 keys 0
+5200 btndown 3
+5250 keys 0x1
+5300 keys 0
+5400 btnup 3
+5500 shot
+5600 btn 2
+5650 enc 2 5
+5700 btn 13
+5800 enc 4 40
+6500 enc 4 -40
+6000 keys 0x2000000
+6100 shot
+6200 keys 0
+6300 shot
+7000 btn 13
+7100 shot
+7200 btn 12
+7300 btn 9
+7350 shot
+7400 keys 0x2
+7500 btn 13
+7700 keys 0
+7800 shot
+7900 btndown 3
+7950 btn 9
+8000 btnup 3
+8100 shot
+8130 keys 0x400000
+8160 keys 0
+8190 shot
+8200 btn 7
+8300 shot
+8500 end

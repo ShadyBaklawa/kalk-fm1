@@ -1,0 +1,8 @@
+# MIDI in: drum notes (channel 10), a tie note, then a clock at 140 BPM with START, then STOP
+500 midi 0x99 36 120
+1000 midi 0x99 38 100
+1500 midi 0x90 62 100
+1990 midi 0xFA 0 0
+2000 clock 140 240
+6400 midi 0xFC 0 0
+8500 end

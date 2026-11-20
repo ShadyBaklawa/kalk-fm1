@@ -1,0 +1,247 @@
+# every WAV variant of every voice, stopped: press the lane key, turn K3 (WAV) one step, again
+200 keys 0x2
+260 keys 0
+560 enc 4 1
+620 keys 0x2
+680 keys 0
+980 enc 4 1
+1040 keys 0x2
+1100 keys 0
+1400 enc 4 1
+1460 keys 0x2
+1520 keys 0
+1820 enc 4 1
+1880 keys 0x2
+1940 keys 0
+2240 enc 4 1
+2300 keys 0x2
+2360 keys 0
+2660 enc 4 1
+2720 keys 0x2
+2780 keys 0
+3080 enc 4 1
+3140 keys 0x2
+3200 keys 0
+3500 enc 4 1
+3560 keys 0x2
+3620 keys 0
+3920 enc 4 1
+3980 keys 0x2
+4040 keys 0
+4340 enc 4 1
+4400 keys 0x2
+4460 keys 0
+4760 enc 4 1
+4820 keys 0x2
+4880 keys 0
+5180 enc 4 1
+5240 keys 0x2
+5300 keys 0
+5600 enc 4 1
+5660 keys 0x2
+5720 keys 0
+6020 enc 4 1
+6080 keys 0x2
+6140 keys 0
+6440 enc 4 1
+6500 keys 0x2
+6560 keys 0
+6860 enc 4 1
+6920 enc 4 -16
+7220 keys 0x8
+7280 keys 0
+7580 enc 4 1
+7640 keys 0x8
+7700 keys 0
+8000 enc 4 1
+8060 keys 0x8
+8120 keys 0
+8420 enc 4 1
+8480 keys 0x8
+8540 keys 0
+8840 enc 4 1
+8900 keys 0x8
+8960 keys 0
+9260 enc 4 1
+9320 keys 0x8
+9380 keys 0
+9680 enc 4 1
+9740 keys 0x8
+9800 keys 0
+10100 enc 4 1
+10160 keys 0x8
+10220 keys 0
+10520 enc 4 1
+10580 keys 0x8
+10640 keys 0
+10940 enc 4 1
+11000 keys 0x8
+11060 keys 0
+11360 enc 4 1
+11420 keys 0x8
+11480 keys 0
+11780 enc 4 1
+11840 keys 0x8
+11900 keys 0
+12200 enc 4 1
+12260 keys 0x8
+12320 keys 0
+12620 enc 4 1
+12680 keys 0x8
+12740 keys 0
+13040 enc 4 1
+13100 keys 0x8
+13160 keys 0
+13460 enc 4 1
+13520 keys 0x8
+13580 keys 0
+13880 enc 4 1
+13940 enc 4 -16
+14240 keys 0x20
+14300 keys 0
+14600 enc 4 1
+14660 keys 0x20
+14720 keys 0
+15020 enc 4 1
+15080 keys 0x20
+15140 keys 0
+15440 enc 4 1
+15500 keys 0x20
+15560 keys 0
+15860 enc 4 1
+15920 keys 0x20
+15980 keys 0
+16280 enc 4 1
+16340 keys 0x20
+16400 keys 0
+16700 enc 4 1
+16760 keys 0x20
+16820 keys 0
+17120 enc 4 1
+17180 keys 0x20
+17240 keys 0
+17540 enc 4 1
+17600 keys 0x20
+17660 keys 0
+17960 enc 4 1
+18020 keys 0x20
+18080 keys 0
+18380 enc 4 1
+18440 keys 0x20
+18500 keys 0
+18800 enc 4 1
+18860 keys 0x20
+18920 keys 0
+19220 enc 4 1
+19280 keys 0x20
+19340 keys 0
+19640 enc 4 1
+19700 keys 0x20
+19760 keys 0
+20060 enc 4 1
+20120 keys 0x20
+20180 keys 0
+20480 enc 4 1
+20540 keys 0x20
+20600 keys 0
+20900 enc 4 1
+20960 enc 4 -16
+21260 keys 0x100
+21320 keys 0
+21850 enc 4 1
+21910 keys 0x100
+21970 keys 0
+22500 enc 4 1
+22560 keys 0x100
+22620 keys 0
+23150 enc 4 1
+23210 keys 0x100
+23270 keys 0
+23800 enc 4 1
+23860 keys 0x100
+23920 keys 0
+24450 enc 4 1
+24510 keys 0x100
+24570 keys 0
+25100 enc 4 1
+25160 keys 0x100
+25220 keys 0
+25750 enc 4 1
+25810 keys 0x100
+25870 keys 0
+26400 enc 4 1
+26460 keys 0x100
+26520 keys 0
+27050 enc 4 1
+27110 keys 0x100
+27170 keys 0
+27700 enc 4 1
+27760 keys 0x100
+27820 keys 0
+28350 enc 4 1
+28410 keys 0x100
+28470 keys 0
+29000 enc 4 1
+29060 keys 0x100
+29120 keys 0
+29650 enc 4 1
+29710 keys 0x100
+29770 keys 0
+30300 enc 4 1
+30360 keys 0x100
+30420 keys 0
+30950 enc 4 1
+31010 keys 0x100
+31070 keys 0
+31600 enc 4 1
+31660 enc 4 -16
+31960 keys 0x400
+32020 keys 0
+32320 enc 4 1
+32380 keys 0x400
+32440 keys 0
+32740 enc 4 1
+32800 keys 0x400
+32860 keys 0
+33160 enc 4 1
+33220 keys 0x400
+33280 keys 0
+33580 enc 4 1
+33640 keys 0x400
+33700 keys 0
+34000 enc 4 1
+34060 keys 0x400
+34120 keys 0
+34420 enc 4 1
+34480 keys 0x400
+34540 keys 0
+34840 enc 4 1
+34900 keys 0x400
+34960 keys 0
+35260 enc 4 1
+35320 keys 0x400
+35380 keys 0
+35680 enc 4 1
+35740 keys 0x400
+35800 keys 0
+36100 enc 4 1
+36160 keys 0x400
+36220 keys 0
+36520 enc 4 1
+36580 keys 0x400
+36640 keys 0
+36940 enc 4 1
+37000 keys 0x400
+37060 keys 0
+37360 enc 4 1
+37420 keys 0x400
+37480 keys 0
+37780 enc 4 1
+37840 keys 0x400
+37900 keys 0
+38200 enc 4 1
+38260 keys 0x400
+38320 keys 0
+38620 enc 4 1
+38680 enc 4 -16
+39480 end

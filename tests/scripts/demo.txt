@@ -1,0 +1,37 @@
+# KALK demo: play A, queue B, hold NOW (remix), C with an XFX low-pass sweep, D, the SEQ page
+100 btn 12
+900 shot
+3500 keys 0x20000
+3600 keys 0
+7600 keys 0x2000000
+9500 keys 0
+9600 shot
+10000 keys 0x100000
+10100 keys 0
+11500 btn 2
+11600 enc 2 6
+11700 enc 4 30
+11800 enc 3 -10
+12000 enc 3 -10
+12400 enc 3 -10
+12800 enc 3 -10
+13200 enc 3 -10
+13300 shot
+13600 enc 3 10
+14000 enc 3 10
+14400 enc 3 10
+14800 enc 3 10
+15200 enc 3 10
+15500 keys 0x400000
+15600 keys 0
+16000 btn 2
+16100 enc 3 -40
+16100 enc 5 70
+18000 btn 11
+18100 shot
+18200 btn 10
+18300 shot
+18400 keys 0x100
+18500 keys 0
+18600 shot
+21500 end

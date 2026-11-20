@@ -1,0 +1,24 @@
+# KALK: build the FM-1 package on GitHub with the Firmware Hub's shared, attested workflow (zvenson/fm1-build).
+# Every push and every manual run: build/kalk.fwsc as the run's "packages" artifact.
+# A tag vX.Y: also build/kalk-X.Y.fwsc, published as the release, with a build attestation.
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    uses: zvenson/fm1-build/.github/workflows/build.yml@v1
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    with:
+      build: |
+        ./build.sh
+        if [ "$GITHUB_REF_TYPE" = tag ]; then ./build.sh --release "${GITHUB_REF_NAME#v}"; fi
+      packages: build/kalk*.fwsc
+      test: sh tests/run_host_tests.sh && sh tests/run_tests.sh

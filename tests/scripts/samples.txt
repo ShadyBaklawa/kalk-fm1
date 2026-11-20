@@ -1,0 +1,27 @@
+# the synth kit, then the CC0 sample kit, voice by voice, while it plays; then the remix held
+100 btn 12
+4000 keys 0x2
+4050 keys 0
+4100 enc 4 19
+5000 keys 0x8
+5050 keys 0
+5100 enc 4 20
+6000 keys 0x20
+6050 keys 0
+6100 enc 4 16
+7000 keys 0x100
+7050 keys 0
+7100 enc 4 15
+8000 keys 0x400
+8050 keys 0
+8100 enc 4 16
+8200 shot
+11800 keys 0x20000
+11900 keys 0
+14000 keys 0x2000000
+16000 keys 0
+16100 keys 0x2
+16150 keys 0
+16200 enc 4 -3
+17000 shot
+20000 end
