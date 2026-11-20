@@ -36,5 +36,19 @@ check("SEL + SAVE loads the saved project: D's cleared kick is back", row(shot(8
 check("NOW held: the peel turns purple", peel(shot(6100))[2] > peel(shot(6100))[1])
 check("NOW let go: the peel is green again", peel(shot(6300))[1] > peel(shot(6300))[2])
 check("the mod lane shows its own length: 12 wedges", lum(px(shot(1100), 5, 0, None, 12)) > 0)
+
+# the FX pages (tests/scripts/pages.txt): the bottom line names the page
+import subprocess, glob, os
+for f in glob.glob("build/host/kalk-*.png"): os.remove(f)
+subprocess.run(["sh", "tests/run_host.sh", "tests/scripts/pages.txt"], stdout=subprocess.DEVNULL, check=True)
+def bottom(ms): return shot(ms).crop((0, 440, 480, 480))
+def flagged(im): return sum(1 for c in list(zip(*[iter(im.tobytes())] * 3)) if (c[0] > 200 and c[1] < 120) or (c[1] > 200 and c[2] < 120))   # red or lime text
+check("FX pressed 10 times: back on the XFX page", list(bottom(200).tobytes()) == list(bottom(900).tobytes()))
+check("FX pressed 6 more times: another page (EQ), not XFX", bottom(1400).tobytes() != bottom(200).tobytes())
+check("REC on the EQ page: no motion recording", flagged(bottom(1600)) == 0)
+check("REC on the XFX page: REC MOTION", flagged(bottom(2200)) > 20)
+g = shot(2900)
+c3, c1 = px(g, 5, 2), px(g, 5, 0)
+check("REMIX > GATE: a white key cuts step 3 (red on the inner ring), step 1 stays open", c3[0] > 200 and c3[1] < 100 and c1[0] < 90)
 sys.exit(0 if ok else 1)
 PY

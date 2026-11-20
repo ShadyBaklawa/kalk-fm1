@@ -63,9 +63,15 @@ typedef struct {
     uint8_t vp[NVOICE][NVP];
     uint8_t fx[NFX];
     uint8_t xy[NXY][2];                         /* 255: no point here */
+    /* (after 0.2) */
+    uint8_t gate[NSTEP];                        /* the GATE lane: ST_ON = cut the sound on this step */
+    uint8_t gmode, grate, gdepth, gsmooth;      /* OFF / PRE (before the effects) / POST; 1/8 1/16 1/32; how much; ramp */
+    uint8_t r2depth, r2rate, r2shape, r2pad;    /* RMX LFO: steps it pushes the play position, its cycle, its shape */
     uint8_t pad[3];
     uint32_t magic;                             /* PROJ_MAGIC: a valid project */
 } project_t;
+enum { GM_OFF, GM_PRE, GM_POST };
+enum { R2_SINE, R2_TRI, R2_SAWUP, R2_SAWDN, R2_SQUARE, R2_RANDOM, R2_DRUNK, NR2 };
 #define PROJ_MAGIC 0x4B4C4B31u                  /* "1KLK" */
 _Static_assert(sizeof(project_t) < 4000u, "a project is one blob");
 

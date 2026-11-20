@@ -10,6 +10,8 @@
  *   REVERB   a metallic FDN at half rate: 4 diffusers, 4 lines (Hadamard), RT60, size, damping, low cut,
  *            modulation, width; fed from the mix (SEND) and from the delay (DLY>RV)
  *   OUT      DIRT (distortion), NORM (a maximiser), GAIN
+ *   GATE     (while playing) a 16-step lane at 1/8, 1/16 or 1/32 that cuts the sound on its steps: PRE (before the
+ *            effects: the echoes and the reverb ring on) or POST (after them: hard cuts); DEPTH, SMOOTH (the ramp)
  */
 
 #define POOL __attribute__((section(".pool")))
@@ -50,7 +52,8 @@ static struct {
     int32_t rlp[4], rhp, rprev[2], rcur[2], rquiet;
     /* out */
     int32_t norm_env, norm_g;
-} X = {.type = 255, .norm_g = 4096, .rp = {255, 255, 255, 255}};
+    int32_t gate_now;                           /* the GATE's gain now, Q15 */
+} X = {.type = 255, .norm_g = 4096, .rp = {255, 255, 255, 255}, .gate_now = 32767};
 
 static int32_t mix15(int32_t dry, int32_t wet, int32_t m) { return dry + MUL15(wet - dry, m); }
 static int32_t fold15(int32_t x)                /* a triangle fold: whatever goes past full scale comes back */
@@ -418,10 +421,30 @@ static void out_stage(int32_t *b, uint32_t n)
     }
 }
 
+/* the GATE: its step from the bar's position (1/8: >> 9, 1/16: >> 8, 1/32: >> 7 of the 16ths in Q8) */
+static void gate(int32_t *b, uint32_t n, uint32_t where)
+{
+    static const uint8_t SH[3] = {9, 8, 7};
+    uint32_t i, sh = SH[P.grate < 3u ? P.grate : 1u];
+    int32_t tg = 32767, k = 32767 >> (P.gsmooth >> 4);   /* SMOOTH 0: at once .. 127: ~4 ms (a ramp per frame) */
+    if (P.gmode != where) return;
+    if (!playing) { if (X.gate_now == 32767) return; }
+    else if (P.gate[(pos16_q8() >> sh) & 15u] & ST_ON) tg = 32767 - (int32_t)P.gdepth * 258;
+    if (tg < 0) tg = 0;
+    if (tg == 32767 && X.gate_now == 32767) return;
+    for (i = 0; i < n; i++) {
+        X.gate_now += MUL15(tg - X.gate_now, k);
+        if (X.gate_now > 32700 && tg == 32767) X.gate_now = 32767;
+        b[2u * i] = MUL15(b[2u * i], X.gate_now);
+        b[2u * i + 1u] = MUL15(b[2u * i + 1u], X.gate_now);
+    }
+}
+
 static void fx_render(int32_t *b, uint32_t n)
 {
     int32_t dry[32];                            /* (n is BLK, 32) the mix before the delay, mono: the reverb's SEND */
     uint32_t i;
+    gate(b, n, GM_PRE);
     xfx(b, n);
     master_filter(b, n);
     eq(b, n);
@@ -429,4 +452,5 @@ static void fx_render(int32_t *b, uint32_t n)
     delay(b, n);
     reverb(b, dry, n);
     out_stage(b, n);
+    gate(b, n, GM_POST);
 }

@@ -89,6 +89,13 @@ the synthesised candidates to `build/vogel/` to audition.
 - **Remix** (ARP): REMIX 1-127 picks a variation of the main lanes (turned, backwards, half and double time, stutters,
   beats shuffled, holes, scattered); EVERY plays it every 8th / 4th / 2nd / every bar; SHIFT moves its start; LANES
   which of K S H it touches. NOW plays it while held.
+- **Remix LFO** (ARP, page 2): DEPTH 0-15 steps that an LFO pushes the play position of the main lanes ahead or back
+  (steps get skipped, repeated, played backwards); RATE 1/4 bar .. 8 bars; SHAPE SINE, TRI, SAW UP, SAW DN, SQUARE,
+  RANDOM (a new jump every step), DRUNK (a step at a time); LANES as above. DEPTH 0: off.
+- **Gate** (ARP, page 3): a 16-step lane that cuts the sound on its steps, while playing. On this page the white keys
+  are its steps and the inner ring shows them in red. GATE: OFF, PRE FX (the echoes and the reverb ring on through the
+  cuts) or POST FX (hard cuts); RATE 1/8, 1/16 or 1/32 (the 16 steps then run twice a bar: stutters); DEPTH (how much
+  it cuts); SMOOTH (the edge: 0 clicks, higher is softer).
 
 ## The effects
 

@@ -1,0 +1,39 @@
+# the FX pages: FX cycles through all of them; REC records the XFX motion only on the XFX page.
+# REMIX > GATE: a white key cuts that step (the inner ring)
+100 btn 2
+200 shot
+300 btn 2
+350 btn 2
+400 btn 2
+450 btn 2
+500 btn 2
+550 btn 2
+600 btn 2
+650 btn 2
+700 btn 2
+750 btn 2
+900 shot
+1000 btn 2
+1050 btn 2
+1100 btn 2
+1150 btn 2
+1200 btn 2
+1250 btn 2
+1400 shot
+1500 btn 13
+1600 shot
+1700 btn 13
+1800 btn 2
+1850 btn 2
+1900 btn 2
+1950 btn 2
+2100 btn 13
+2200 shot
+2300 btn 13
+2600 btn 10
+2650 enc 0 1
+2700 enc 0 1
+2800 keys 0x10
+2850 keys 0
+2900 shot
+3100 end

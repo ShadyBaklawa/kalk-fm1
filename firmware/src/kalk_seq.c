@@ -7,6 +7,8 @@
  *                    then plays 3 even steps across the bar)
  *   remix            one of 127 variations of the main sequence, every 8th / 4th / 2nd / every bar, or held (NOW);
  *                    SHIFT moves where the variation starts
+ *   RMX LFO          (RMX2) an LFO on the main lanes' play position: up to 15 steps ahead or behind, synced (1/4 bar ..
+ *                    8 bars), SINE TRI SAW UP SAW DN SQUARE, RANDOM (a new jump each step) or DRUNK (a step at a time)
  */
 
 #define Q24 (1u << 24)
@@ -102,10 +104,36 @@ static void play_lane(uint32_t l, uint32_t st, int32_t val)
     }
 }
 
+/* the RMX LFO's offset now, in steps (-15..15), at the step gstep */
+static const uint8_t R2_STEPS[6] = {4, 8, 16, 32, 64, 128};   /* its cycle: 1/4 bar .. 8 bars */
+static int32_t r2_walk;
+static int32_t rmx_lfo(void)
+{
+    uint32_t depth = P.r2depth > 15u ? 15u : P.r2depth, per = R2_STEPS[P.r2rate < 6u ? P.r2rate : 2u];
+    uint32_t ph = (gstep % per) * (0xFFFFFFFFu / per);   /* 32-bit phase */
+    int32_t v;                                  /* Q15, -1..1 */
+    if (!depth) return 0;
+    switch (P.r2shape) {
+    case R2_TRI: v = tri15(ph); break;
+    case R2_SAWUP: v = (int32_t)(ph >> 16) - 32768; break;
+    case R2_SAWDN: v = 32767 - (int32_t)(ph >> 16); break;
+    case R2_SQUARE: v = ph < 0x80000000u ? 32767 : -32767; break;
+    case R2_RANDOM: v = (int32_t)(rnd() >> 16) - 32768; break;
+    case R2_DRUNK:
+        r2_walk += (rnd() >> 31) ? 1 : -1;
+        r2_walk = clampi(r2_walk, -(int32_t)depth, (int32_t)depth);
+        return r2_walk;
+    default: v = sin15(ph); break;
+    }
+    v = (v * (int32_t)depth + (v >= 0 ? 16384 : -16384)) >> 15;   /* (rounded) */
+    return clampi(v, -(int32_t)depth, (int32_t)depth);
+}
+
 static void fire_main(void)
 {
     uint32_t l, len = P.len ? P.len : 16u, pos = S.pos, pat = cur_pat & 3u;
     int remixing = P.remix && (S.remix_on || now_held);
+    int32_t off = rmx_lfo();
     for (l = 0; l < NMAIN; l++) {
         uint32_t src = pos, st;
         if (remixing && (P.rlanes >> l & 1u)) {
@@ -113,6 +141,7 @@ static void fire_main(void)
             if (m < 0) continue;
             src = (uint32_t)m % len;
         }
+        if (off && (P.rlanes >> l & 1u)) src = (uint32_t)((int32_t)src + off + 16 * (int32_t)len) % len;
         st = P.main[pat][l][(P.start + src) & 15u];
         if ((st & ST_ON) && lane_live(l))
             play_lane(l, st, 0);
@@ -157,6 +186,7 @@ static void seq_start(void)
     ui_bar = 0;
     gstep = 0;
     S.remix_on = (uint8_t)(P.rfreq == 4u);
+    r2_walk = 0;
     playing = 1;
 }
 

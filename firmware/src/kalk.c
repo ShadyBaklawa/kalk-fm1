@@ -83,6 +83,8 @@ static void proj_default(project_t *p)
     p->chain_len = 0;
     for (s = 0; s < NCHAIN; s++) p->chain[s] = (uint8_t)(s & 3u);
     p->remix = 37; p->rfreq = 2; p->rshift = 0; p->rlanes = 7;
+    p->gmode = GM_OFF; p->grate = 1; p->gdepth = 127; p->gsmooth = 32;   /* the GATE: off, 1/16, full, a soft edge */
+    p->r2depth = 0; p->r2rate = 2; p->r2shape = R2_SINE;               /* the RMX LFO: off (depth 0), 1 bar, sine */
     p->bpm = 124;
     for (a = 0; a < NVOICE; a++) for (l = 0; l < NVP; l++) p->vp[a][l] = VP_DEFAULT[a][l];
     for (l = 0; l < NFX; l++) p->fx[l] = FX0[l];
@@ -96,7 +98,8 @@ static struct { uint8_t slot, ch, out, sync; uint32_t magic; } set;
 /* ======================================================================== the parameters on the screen */
 enum { K_VP, K_FX, K_SQ, K_GL, K_SL };          /* voice, effects, sequence, global, the selected second-window lane */
 enum { SQ_LEN, SQ_START, SQ_SWING, SQ_HALF, SQ_TLEN, SQ_PLEN, SQ_MLEN, SQ_STRETCH, SQ_CHAIN, SQ_SLOT, SQ_CPAT, SQ_BPM,
-       SQ_RMX, SQ_RFREQ, SQ_RSHIFT, SQ_RLANES };
+       SQ_RMX, SQ_RFREQ, SQ_RSHIFT, SQ_RLANES, SQ_R2DEPTH, SQ_R2RATE, SQ_R2SHAPE, SQ_GMODE, SQ_GRATE, SQ_GDEPTH,
+       SQ_GSMOOTH, NSQ };
 enum { GL_BPM, GL_CH, GL_OUT, GL_SYNC };
 enum { SL_LEN, SL_STRETCH };
 enum { F_WAV, F_NUM, F_SEMI, F_MS, F_HZ, F_LIST, F_PAN, F_BIP, F_PLUS1, F_PCT, F_TICKS, F_MASK3, F_CHAIN, F_PAT, F_OMNI, F_LEN, F_RT };
@@ -121,8 +124,9 @@ static const char *const FX_NAMES[NFX] = {
     "CUT", "RES", "MOD", "TRK", "LO", "MID", "HI", "AMP", "GAIN", "PITCH", "DIRT", "NORM",
     "TIME", "SIZE", "DAMP", "SEND", "LOW", "MOD", "WIDTH", "DLY>RV",
     "FREQ", "RES", "FILT", "LO CUT", "LFO", "DMOD", "FM", "INVERT"};
-static const char *const SQ_NAMES[16] = {"LEN", "START", "SWING", "HALF", "TIE LN", "POD LN", "MOD LN", "STRTCH",
-                                         "CHAIN", "SLOT", "PATT", "BPM", "REMIX", "EVERY", "SHIFT", "LANES"};
+static const char *const SQ_NAMES[NSQ] = {"LEN", "START", "SWING", "HALF", "TIE LN", "POD LN", "MOD LN", "STRTCH",
+                                         "CHAIN", "SLOT", "PATT", "BPM", "REMIX", "EVERY", "SHIFT", "LANES",
+                                          "DEPTH", "RATE", "SHAPE", "GATE", "RATE", "DEPTH", "SMOOTH"};
 static const char *const GL_NAMES[4] = {"BPM", "CHAN", "OUT", "SYNC"};
 
 static const char *const L_FILT[] = {"LP", "BP", "HP"};
@@ -131,6 +135,10 @@ static const char *const L_XFX[NXF] = {"THRU", "CRUSH", "BPF", "RING", "COMB", "
 static const char *const L_MOTION[] = {"OFF", "PLAY", "SMOOTH"};
 static const char *const L_MODFX[] = {"OFF", "GATE", "MIX", "X"};
 static const char *const L_OFFON[] = {"OFF", "ON"};
+static const char *const L_R2RATE[] = {"1/4 BAR", "1/2 BAR", "1 BAR", "2 BAR", "4 BAR", "8 BAR"};
+static const char *const L_R2SHAPE[NR2] = {"SINE", "TRI", "SAW UP", "SAW DN", "SQUARE", "RANDOM", "DRUNK"};
+static const char *const L_GMODE[] = {"OFF", "PRE FX", "POST FX"};
+static const char *const L_GRATE[] = {"1/8", "1/16", "1/32"};
 static const char *const L_DLFO[] = {"1/16", "1/8", "1/4", "1/2", "1 BAR", "2 BAR", "4 BAR"};
 static const char *const L_EVERY[] = {"OFF", "8 BAR", "4 BAR", "2 BAR", "1 BAR"};
 static const char *const L_SYNC[] = {"INT", "MIDI"};
@@ -149,7 +157,8 @@ static const pref_t PG_VOICE[4][4] = {
 static const char *const PG_VOICE_T[5] = {"SOUND", "FILTER", "SHAPE", "MOD", "LANE"};
 static const pref_t PG_LANE[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_SQ, SQ_SWING}, {K_SQ, SQ_LEN}};
 static const pref_t PG_MODL[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_FX, FX_MODFX}, {K_FX, FX_FMOD}};
-static const pref_t PG_FX[10][4] = {
+#define NPG_FX 10u                              /* the FX pages (XFX is the first) */
+static const pref_t PG_FX[NPG_FX][4] = {
     {{K_FX, FX_XTYPE}, {K_FX, FX_X}, {K_FX, FX_Y}, {K_FX, FX_XAUTO}},
     {{K_FX, FX_DL}, {K_FX, FX_DR}, {K_FX, FX_DFB}, {K_FX, FX_DSEND}},
     {{K_FX, FX_DDAMP}, {K_FX, FX_DWIDTH}, {K_FX, FX_XMIX}, {K_FX, FX_MODFX}},
@@ -161,7 +170,7 @@ static const pref_t PG_FX[10][4] = {
     {{K_FX, FX_RTIME}, {K_FX, FX_RSIZE}, {K_FX, FX_RDAMP}, {K_FX, FX_RSEND}},
     {{K_FX, FX_RLOW}, {K_FX, FX_RMOD}, {K_FX, FX_RWIDTH}, {K_FX, FX_RDLY}},
 };
-static const char *const PG_FX_T[10] = {"XFX", "DELAY", "DELAY 2", "RESON", "TAPE LFO", "FILTER", "EQ", "OUT", "REVERB",
+static const char *const PG_FX_T[NPG_FX] = {"XFX", "DELAY", "DELAY 2", "RESON", "TAPE LFO", "FILTER", "EQ", "OUT", "REVERB",
                                          "REVERB 2"};
 static const pref_t PG_SEQ[3][4] = {
     {{K_SQ, SQ_LEN}, {K_SQ, SQ_START}, {K_SQ, SQ_SWING}, {K_SQ, SQ_HALF}},
@@ -169,15 +178,23 @@ static const pref_t PG_SEQ[3][4] = {
     {{K_SQ, SQ_CHAIN}, {K_SQ, SQ_SLOT}, {K_SQ, SQ_CPAT}, {K_SQ, SQ_BPM}},
 };
 static const char *const PG_SEQ_T[3] = {"MAIN", "LANES", "CHAIN"};
-static const pref_t PG_RMX[4] = {{K_SQ, SQ_RMX}, {K_SQ, SQ_RFREQ}, {K_SQ, SQ_RSHIFT}, {K_SQ, SQ_RLANES}};
+static const pref_t PG_RMX[3][4] = {
+    {{K_SQ, SQ_RMX}, {K_SQ, SQ_RFREQ}, {K_SQ, SQ_RSHIFT}, {K_SQ, SQ_RLANES}},
+    {{K_SQ, SQ_R2DEPTH}, {K_SQ, SQ_R2RATE}, {K_SQ, SQ_R2SHAPE}, {K_SQ, SQ_RLANES}},
+    {{K_SQ, SQ_GMODE}, {K_SQ, SQ_GRATE}, {K_SQ, SQ_GDEPTH}, {K_SQ, SQ_GSMOOTH}},
+};
+static const char *const PG_RMX_T[3] = {"", "LFO", "GATE"};
+/* the REMIX section's GATE page: the white keys are the gate's steps, the inner ring shows them */
+static int gate_edit(void);
 static const pref_t PG_GLO[4] = {{K_GL, GL_BPM}, {K_GL, GL_CH}, {K_GL, GL_OUT}, {K_GL, GL_SYNC}};
 
 static uint32_t npages(void)
 {
     switch (section) {
     case SEC_VOICE: return sel_lane == L_MOD ? 1u : sel_lane >= L_TIE ? 5u : 4u;
-    case SEC_FX: return 10u;
+    case SEC_FX: return NPG_FX;
     case SEC_SEQ: return 3u;
+    case SEC_RMX: return 3u;
     default: return 1u;
     }
 }
@@ -190,7 +207,7 @@ static const pref_t *page_refs(void)
         return pg == 4u ? PG_LANE : PG_VOICE[pg];
     case SEC_FX: return PG_FX[pg];
     case SEC_SEQ: return PG_SEQ[pg];
-    case SEC_RMX: return PG_RMX;
+    case SEC_RMX: return PG_RMX[pg];
     default: return PG_GLO;
     }
 }
@@ -201,6 +218,7 @@ static const char *page_title(void)
     case SEC_VOICE: return sel_lane == L_MOD ? "LANE" : PG_VOICE_T[pg];
     case SEC_FX: return PG_FX_T[pg];
     case SEC_SEQ: return PG_SEQ_T[pg];
+    case SEC_RMX: return PG_RMX_T[pg];
     default: return "";
     }
 }
@@ -266,6 +284,13 @@ static pval_t pval(pref_t r)
         case SQ_RFREQ: v.p = &P.rfreq; v.max = 4; v.fmt = F_LIST; v.list = L_EVERY; break;
         case SQ_RSHIFT: v.p = &P.rshift; v.max = 15; break;
         case SQ_RLANES: v.p = &P.rlanes; v.min = 1; v.max = 7; v.fmt = F_MASK3; break;
+        case SQ_R2DEPTH: v.p = &P.r2depth; v.max = 15; break;
+        case SQ_R2RATE: v.p = &P.r2rate; v.max = 5; v.fmt = F_LIST; v.list = L_R2RATE; break;
+        case SQ_R2SHAPE: v.p = &P.r2shape; v.max = NR2 - 1; v.fmt = F_LIST; v.list = L_R2SHAPE; break;
+        case SQ_GMODE: v.p = &P.gmode; v.max = 2; v.fmt = F_LIST; v.list = L_GMODE; break;
+        case SQ_GRATE: v.p = &P.grate; v.max = 2; v.fmt = F_LIST; v.list = L_GRATE; break;
+        case SQ_GDEPTH: v.p = &P.gdepth; break;
+        case SQ_GSMOOTH: v.p = &P.gsmooth; break;
         }
         break;
     case K_GL:
@@ -363,6 +388,12 @@ static uint32_t msg_until;
 static void say(const char *s) { put_s(msg, s); msg_until = fm1_ms + 1400u; }
 
 static uint8_t *lane_step(uint32_t l, uint32_t s) { return l < NMAIN ? &P.main[edit_pat][l][s] : &P.sec[l - NMAIN][s]; }
+static int gate_edit(void) { return section == SEC_RMX && page[SEC_RMX] % 3u == 2u; }
+static uint32_t gate_pos(void)                  /* the GATE's step now (as kalk_fx.c's gate() finds it) */
+{
+    static const uint8_t SH[3] = {9, 8, 7};
+    return (pos16_q8() >> SH[P.grate < 3u ? P.grate : 1u]) & 15u;
+}
 
 /* ---- the screen: a lime slice. Six rings, one a lane (the kick outside), each cut into as many wedges as its lane
  * has steps, so a 5-step pod turns against a 16-step kick; the peel is the playhead's track (purple while the remix
@@ -422,6 +453,17 @@ static void draw_screen(void)
         uint16_t base = muted ? RGB(110, 110, 110) : LANE_COL[l];
         ring_len[l] = l < NMAIN ? 16u : (P.slen[l - NMAIN] ? P.slen[l - NMAIN] : 16u);
         if (playing) ph = l < NMAIN ? play_main : ui_spos[l - NMAIN];
+        if (l == L_MOD && gate_edit()) {        /* the GATE page: the inner ring is the gate (red: a cut) */
+            ring_len[l] = 16u;
+            ph = playing ? gate_pos() : 99u;
+            for (s = 0; s < 16u; s++) {
+                uint16_t c = (P.gate[s] & ST_ON) ? RGB(255, 60, 60) : RGB(50, 16, 16);
+                if (s == ph) c = col_mix(c, C_WHITE, 55);
+                cell[l][s] = swap16(c);
+                flag[l][s] = 0;
+            }
+            continue;
+        }
         for (s = 0; s < ring_len[l]; s++) {
             uint32_t st = *lane_step(l, s), in = l < NMAIN ? ((s - P.start) & 15u) < len : 1u;
             uint16_t c;
@@ -535,7 +577,7 @@ static void draw_screen(void)
                 if (*page_title()) { d = put_s(d, " "); d = put_s(d, page_title()); }
                 if (npages() > 1u) { d = put_s(d, " "); d = put_u(d, page[section] % npages() + 1u); d = put_s(d, "/"); d = put_u(d, npages()); }
                 if (section == SEC_GLO) { d = put_s(d, " CPU "); d = put_u(d, cpu_pct); put_s(d, "%"); }
-                if (section == SEC_FX && page[SEC_FX] % 6u == 0u && xy_rec) { put_s(a, "REC MOTION"); c = RGB(255, 70, 70); }
+                if (section == SEC_FX && page[SEC_FX] % NPG_FX == 0u && xy_rec) { put_s(a, "REC MOTION"); c = RGB(255, 70, 70); }
             }
             cv_text(120 - text_w(&FONT_S, a) / 2, 224, &FONT_S, a, c);
         }
@@ -564,6 +606,7 @@ static uint32_t grid_sig(void)
     for (i = 0; i < NSEC * NSTEP; i++) h = h * 31u + b[i] + (uint32_t)P.val[i / NSTEP][i % NSTEP] * 3u;
     for (i = 0; i < NSEC; i++) h = h * 31u + P.slen[i];
     if (playing) { h = h * 31u + ui_pos + cur_pat * 64u; for (i = 0; i < NSEC; i++) h = h * 31u + ui_spos[i]; }
+    if (gate_edit()) { h = h * 31u + 77u + (playing ? gate_pos() : 99u); for (i = 0; i < NSTEP; i++) h = h * 31u + P.gate[i]; }
     return h;
 }
 static uint32_t head_sig(void)
@@ -596,6 +639,7 @@ static void step_down(uint32_t s)
 {
     uint8_t *st = lane_step(sel_lane, s);
     int8_t k = step_key(s);
+    if (gate_edit()) { P.gate[s] ^= ST_ON; key_long[k] = 1; key_off[k] = 0; proj_dirty = 1; return; }   /* a cut on / off */
     if (fm1_in.buttons & (1u << BTN_SEL) && sel_lane == L_HAT) {   /* SEL + a hat step: open / closed */
         *st = (uint8_t)((*st | ST_ON) ^ ST_OPEN);
         key_long[k] = 1;
@@ -616,7 +660,7 @@ static void step_hold(uint32_t s)
 {
     int8_t k = step_key(s);
     uint8_t *st = lane_step(sel_lane, s);
-    if (key_long[k] || fm1_ms - key_t0[k] < 350u || sel_lane == L_MOD) return;
+    if (key_long[k] || fm1_ms - key_t0[k] < 350u || sel_lane == L_MOD || gate_edit()) return;
     key_long[k] = 1;
     key_off[k] = 0;
     *st = (uint8_t)((*st | ST_ON) ^ ST_ACC);    /* held: the accent */
@@ -626,6 +670,7 @@ static void step_up(uint32_t s)
 {
     int8_t k = step_key(s);
     uint8_t *st = lane_step(sel_lane, s);
+    if (gate_edit()) { key_off[k] = 0; return; }
     if (key_off[k]) *st = 0;
     key_off[k] = 0;
     if (held_step == (int8_t)s) held_step = -1;
@@ -797,7 +842,7 @@ static void app_main(void)
             if (section == SEC_VOICE) page[SEC_VOICE] = (uint8_t)((page[SEC_VOICE] + 1u) % npages());
             section = SEC_VOICE;
         }
-        if (b & (1u << BTN_FX)) { if (section == SEC_FX) page[SEC_FX] = (uint8_t)((page[SEC_FX] + 1u) % 6u); section = SEC_FX; }
+        if (b & (1u << BTN_FX)) { if (section == SEC_FX) page[SEC_FX] = (uint8_t)((page[SEC_FX] + 1u) % NPG_FX); section = SEC_FX; }
         if (b & (1u << BTN_SEQ)) { if (section == SEC_SEQ) page[SEC_SEQ] = (uint8_t)((page[SEC_SEQ] + 1u) % 3u); section = SEC_SEQ; }
         if (b & (1u << BTN_ARP)) section = SEC_RMX;
         if (b & (1u << BTN_GLO)) section = SEC_GLO;
@@ -812,7 +857,7 @@ static void app_main(void)
                 uint32_t s;
                 for (s = 0; s < NSTEP; s++) *lane_step((uint32_t)lane_key, s) = 0;
                 say("CLEARED");
-            } else if (section == SEC_FX && page[SEC_FX] % 6u == 0u) {
+            } else if (section == SEC_FX && page[SEC_FX] % NPG_FX == 0u) {
                 if (fm1_in.buttons & (1u << BTN_SEL)) {   /* SEL + REC: forget the motion */
                     for (k = 0; k < NXY; k++) P.xy[k][0] = P.xy[k][1] = 255;
                     xy_rec = 0;
@@ -878,7 +923,10 @@ static void app_main(void)
             for (k = 0; k < NKEY; k++) {
                 int8_t s = KEY_STEP[k];
                 int on = 0, glow = 0;
-                if (s >= 0) {
+                if (s >= 0 && gate_edit()) {
+                    on = (P.gate[s] & ST_ON) != 0u;
+                    if (playing && (uint32_t)s == gate_pos()) on = !on;
+                } else if (s >= 0) {
                     on = (*lane_step(sel_lane, (uint32_t)s) & ST_ON) != 0u;
                     if (sel_lane >= NMAIN && (uint32_t)s >= len) on = 0;
                     if (playing && (uint32_t)s == ph && (sel_lane >= NMAIN || edit_pat == cur_pat)) on = !on;

@@ -1,0 +1,43 @@
+# KALK glitch remix demo: a light delay; the RMX LFO (sine, square, random) on the play position; then the GATE
+# at 1/32, POST FX (hard cuts), then PRE FX (the echoes ring through the cuts)
+100 btn 12
+150 btn 2
+160 enc 0 1
+170 enc 5 10
+200 btn 10
+210 enc 0 1
+3900 enc 2 1
+3910 enc 2 1
+3920 enc 2 1
+3930 enc 2 1
+3940 enc 2 1
+3950 enc 2 1
+4000 shot
+7800 enc 4 1
+7810 enc 4 1
+7820 enc 4 1
+7830 enc 4 1
+7900 shot
+11700 enc 4 1
+11800 shot
+15600 enc 0 1
+15610 enc 2 1
+15620 enc 2 1
+15630 enc 3 1
+15700 keys 0x10
+15720 keys 0
+15740 keys 0x40
+15760 keys 0
+15780 keys 0x800
+15800 keys 0
+15820 keys 0x1000
+15840 keys 0
+15860 keys 0x40000
+15880 keys 0
+15900 keys 0x1000000
+15920 keys 0
+16100 shot
+19500 enc 2 -1
+19600 shot
+23400 btn 12
+25500 end

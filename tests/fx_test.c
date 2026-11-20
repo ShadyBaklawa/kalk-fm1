@@ -228,6 +228,40 @@ int main(void)
               "INVERT: the feedback flips each echo's sign");
     }
 
+    /* ---- the GATE (while playing): POST cuts to silence on its steps, PRE lets the echoes ring on, stopped: nothing */
+    {
+        static int32_t b[2 * B];
+        double pk_cut[3], pk_open[3];
+        uint32_t m, k;
+        for (m = 0; m < 3u; m++) {              /* 0: POST, 1: PRE, 2: POST but stopped */
+            fx_reset(); fx_neutral();
+            P.fx[FX_DSEND] = 127; P.fx[FX_DFB] = 90; P.fx[FX_DL] = P.fx[FX_DR] = 1;   /* echoes a 16th apart */
+            memset(P.gate, 0, sizeof P.gate);
+            P.gate[2] = P.gate[3] = ST_ON;      /* cut steps 3 and 4 */
+            P.gmode = m == 1u ? GM_PRE : GM_POST; P.grate = 1; P.gdepth = 127; P.gsmooth = 32;
+            playing = m != 2u;
+            pk_cut[m] = pk_open[m] = 0;
+            for (gstep = 0; gstep < 8u; gstep++)
+                for (k = 0; k < 5512u / B; k++) {
+                    S.frac = k * B * (Q24 / 5512u);
+                    for (i = 0; i < 2 * B; i++) b[i] = (gstep < 4u) ? noise15() : 0;   /* sound on steps 1..4 */
+                    fx_render(b, B);
+                    if (k > 20u)                /* (past the ramp) */
+                        for (i = 0; i < 2 * B; i++) {
+                            double a = fabs(b[i] / 32768.0);
+                            if (gstep == 2u || gstep == 3u) { if (a > pk_cut[m]) pk_cut[m] = a; }
+                            else if (gstep == 1u) { if (a > pk_open[m]) pk_open[m] = a; }
+                        }
+                }
+        }
+        playing = 0;
+        printf("     peaks on the cut steps: POST %.4f, PRE %.4f, stopped %.4f (open step: %.3f)\n", pk_cut[0], pk_cut[1], pk_cut[2], pk_open[0]);
+        check(pk_open[0] > 0.05 && pk_cut[0] < 0.001, "GATE POST: silence on its steps, sound on the others");
+        check(pk_cut[1] > 0.01, "GATE PRE: the echoes ring on through the cut");
+        check(pk_cut[2] > 0.05, "GATE: stopped, it does nothing (the pads play)");
+        check(sizeof(project_t) < 4000u, "the project still fits its blob");
+    }
+
     /* a 0.2 project: everything it had is kept; the new effects keep their defaults */
     {
         static project02_t o;
@@ -241,6 +275,8 @@ int main(void)
         proj_upgrade02(&t2, &o);
         if (memcmp(&t2, o.head, sizeof o.head) || memcmp(t2.fx, o.fx, NFX02) || memcmp(t2.xy, o.xy, sizeof o.xy)) same = 0;
         for (i = NFX02; i < NFX; i++) if (t2.fx[i] != 0xAA) same = 0;
+        for (i = 0; i < NSTEP; i++) if (t2.gate[i] != 0xAA) same = 0;   /* the GATE and the RMX LFO: defaults too */
+        if (t2.gmode != 0xAA || t2.r2depth != 0xAA || t2.r2shape != 0xAA) same = 0;
         check(same && t2.magic == PROJ_MAGIC, "0.2 project upgrade: its steps, sounds, effects and motion kept; reverb from defaults");
     }
 
