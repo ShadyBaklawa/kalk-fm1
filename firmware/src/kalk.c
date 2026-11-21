@@ -10,6 +10,8 @@
  *   HOME / EDIT  the selected lane's sound    FX  effects    SEQ  sequence    ARP  remix    GLO  global
  *   SELECT the page   K1..K4 the four values   ALGORITHM the tempo   PRESETS the project slot
  *   SAVE   save to the slot (stopped)   SEL + SAVE   load it   ENV mute the lane   LFO solo the lane
+ *          (an empty slot loads as the demo with that slot's own kit: CLASSIC, ACOUSTIC, FM, CRUSH, ...)
+ *   SEL + HOME  a random kit (every voice's sound)   SEL + GLO  swap back to the kit before
  *   OCT- / OCT+  the previous / next lane
  *   on TIE, POD, MOD: hold a step and turn K1 for its value
  *
@@ -93,6 +95,73 @@ static void proj_default(project_t *p)
     for (l = 0; l < NFX2; l++) p->fx2[l] = FX2_0[l];
     for (l = 0; l < NTOR; l++) p->tor[l] = TOR0[l];
     p->magic = PROJ_MAGIC;
+}
+
+/* ======================================================================== the starter kits, the random kit */
+/* an empty slot starts as the demo with its own kit: WAV per voice (KICK SNARE HAT TIE POD). Slot 1's is the sound
+ * KALK always had (VP_DEFAULT), so a first start sounds as before. 0..15 the synth's variants, 16..23 the samples. */
+#define NKIT 8u
+static const char *const KIT_NAME[NKIT] = {"CLASSIC", "ACOUSTIC", "FM", "CRUSH", "COMB", "PERC", "SYNTH 2", "MIXED"};
+static const uint8_t KIT_WAV[NKIT][NVOICE] = {
+    {0, 1, 0, 2, 0},                            /* SYN 1, 2, 1, 3, 1 */
+    {20, 21, 21, 21, 21},                       /* BDRUM SNARE HIHAT COWBELL CLAVES */
+    {16, 16, 16, 16, 16},                       /* FMTHUD RINGSN FMHAT FMPING ZAPFM */
+    {18, 18, 19, 20, 20},                       /* CRSHKIK CRSHSN GRANHAT CRSHPNG BITBLIP */
+    {19, 19, 18, 17, 17},                       /* COMBKIK COMBSN COMBHAT RINGPNG COMBCLK */
+    {22, 22, 22, 23, 23},                       /* TUMBA RIMSHOT SHAKER CONGA TRIANGL */
+    {5, 9, 6, 10, 12},                          /* SYN 6, 10, 7, 11, 13 */
+    {23, 23, 23, 18, 18},                       /* LOG LO CLAP TAMB KARPLUS GLASS */
+};
+static void proj_new(project_t *p, uint32_t slot)   /* what an empty slot holds */
+{
+    uint32_t v;
+    proj_default(p);
+    for (v = 0; v < NVOICE; v++) p->vp[v][VP_WAV] = KIT_WAV[slot % NKIT][v];
+}
+
+/* SEL + HOME: every voice gets a new random sound (WAV, tune, decay, filter, its character knobs). Levels, the
+ * patterns, the MOD lane, the effects and the EXTRA pages stay. SEL + GLO swaps back to the kit before (and again). */
+static uint8_t kit_prev[NVOICE][NVP], kit_prev_ok;
+static uint32_t kit_seed;
+static int32_t krnd(int32_t n) { kit_seed = thash(kit_seed + 40503u); return (int32_t)(kit_seed % (uint32_t)n); }
+static uint8_t rclamp(int32_t x) { return (uint8_t)(x < 0 ? 0 : x > 127 ? 127 : x); }
+static void kit_random(project_t *p, uint32_t seed)
+{
+    static const int8_t TIE_TUNE[5] = {-12, -5, 0, 0, 7};
+    uint32_t v;
+    kit_seed = seed;
+    for (v = 0; v < NVOICE; v++) {
+        uint8_t *q = p->vp[v];
+        int32_t d0 = VP_DEFAULT[v][VP_DECAY];
+        q[VP_WAV] = (uint8_t)(krnd(2) ? 16 + krnd(8) : krnd(16));   /* half the time a sample */
+        q[VP_TUNE] = (uint8_t)(v == 3u ? 24 + TIE_TUNE[krnd(5)] : 24 + krnd(11) - 5);
+        q[VP_DECAY] = rclamp(d0 - 24 + krnd(49));
+        q[VP_RES] = (uint8_t)krnd(v == 3u ? 70 : 40);
+        switch (v) {
+        case 0:                                 /* kick: SAT CLICK SWEEP HOLD */
+            q[VP_CUT] = (uint8_t)(96 + krnd(32)); q[VP_X1] = (uint8_t)krnd(48); q[VP_X2] = (uint8_t)krnd(60);
+            q[VP_X3] = (uint8_t)(40 + krnd(50)); q[VP_X4] = (uint8_t)krnd(24);
+            break;
+        case 1:                                 /* snare: SAT SNAPPY FLAM HOLD */
+            q[VP_CUT] = (uint8_t)(90 + krnd(38)); q[VP_X1] = (uint8_t)krnd(48); q[VP_X2] = (uint8_t)(30 + krnd(80));
+            q[VP_X3] = (uint8_t)(krnd(4) ? 0 : krnd(40)); q[VP_X4] = (uint8_t)krnd(16);
+            break;
+        case 2:                                 /* hat: OPEN decay, (LINK stays), NOISE; a little to the side */
+            q[VP_CUT] = (uint8_t)(70 + krnd(50)); q[VP_X1] = (uint8_t)(40 + krnd(70)); q[VP_X3] = (uint8_t)krnd(64);
+            q[VP_PAN] = (uint8_t)(52 + krnd(25));
+            break;
+        case 3:                                 /* tie: FM RATIO PORT ATTACK; any filter type */
+            q[VP_CUT] = (uint8_t)(50 + krnd(70)); q[VP_FTYPE] = (uint8_t)krnd(3); q[VP_X1] = (uint8_t)krnd(100);
+            q[VP_X2] = (uint8_t)krnd(128); q[VP_X3] = (uint8_t)(krnd(3) ? 0 : krnd(60)); q[VP_X4] = (uint8_t)(krnd(3) ? 0 : krnd(40));
+            q[VP_PAN] = (uint8_t)(44 + krnd(41));
+            break;
+        default:                                /* pod: ZAP ZAPDEC NOISE */
+            q[VP_CUT] = (uint8_t)(80 + krnd(48)); q[VP_FTYPE] = (uint8_t)krnd(2); q[VP_X1] = (uint8_t)krnd(100);
+            q[VP_X2] = (uint8_t)krnd(60); q[VP_X3] = (uint8_t)krnd(30);
+            q[VP_PAN] = (uint8_t)(34 + krnd(41));
+            break;
+        }
+    }
 }
 
 static struct { uint8_t slot, ch, out, sync; uint32_t magic; } set;
@@ -985,7 +1054,7 @@ static void app_main(void)
     if (settings_load(&set, sizeof set) || set.magic != SET_MAGIC || set.slot > 7u || set.ch > 16u) {
         set.slot = 0; set.ch = 0; set.out = 0; set.sync = 1; set.magic = SET_MAGIC;
     }
-    if (proj_load(set.slot)) proj_default(&P);
+    if (proj_load(set.slot)) proj_new(&P, set.slot);
     pitch_all = (int8_t)((int32_t)P.fx[FX_PITCH] - 12);
     set_tempo();
     last_set = set.slot | set.ch << 4 | set.out << 9 | set.sync << 10;
@@ -1026,7 +1095,15 @@ static void app_main(void)
         if (b & (1u << BTN_PLAY)) { ext_run = 0; if (playing) { stop_req = 1; xy_rec = 0; } else play_req = 1; }
         {
             uint32_t back = (fm1_in.buttons >> BTN_SEL) & 1u;   /* SEL held: back */
-            if (b & (1u << BTN_HOME)) { section = SEC_VOICE; page[SEC_VOICE] = 0; }   /* HOME: the lane's SOUND */
+            if (b & (1u << BTN_HOME)) {
+                if (back) {                     /* SEL + HOME: a random kit (the one before kept for SEL + GLO) */
+                    static uint32_t rolls;
+                    char m[24];
+                    memcpy(kit_prev, P.vp, sizeof kit_prev); kit_prev_ok = 1;
+                    kit_random(&P, fm1_ms * 2654435761u + ++rolls * 40503u);
+                    put_u(put_s(m, "RANDOM KIT "), rolls); say(m); proj_dirty = 1;
+                } else { section = SEC_VOICE; page[SEC_VOICE] = 0; }   /* HOME: the lane's SOUND */
+            }
             if (b & (1u << BTN_EDIT)) section_button(SEC_VOICE, back);   /* EDIT: through the lane's pages */
             if (b & (1u << BTN_FX)) {
                 if (section == SEC_FX) {         /* FX again: the next group's first page (SEL: the one before) */
@@ -1039,7 +1116,13 @@ static void app_main(void)
             }
             if (b & (1u << BTN_SEQ)) section_button(SEC_SEQ, back);
             if (b & (1u << BTN_ARP)) section_button(SEC_RMX, back);
-            if (b & (1u << BTN_GLO)) section = SEC_GLO;
+            if (b & (1u << BTN_GLO)) {
+                if (back && kit_prev_ok) {      /* SEL + GLO: the kit before the last roll (again: back) */
+                    uint8_t t[NVOICE][NVP];
+                    memcpy(t, P.vp, sizeof t); memcpy(P.vp, kit_prev, sizeof t); memcpy(kit_prev, t, sizeof t);
+                    say("KIT SWAPPED"); proj_dirty = 1;
+                } else section = SEC_GLO;
+            }
         }
         if (b & (1u << BTN_OCT_DOWN)) { sel_lane = (uint8_t)((sel_lane + NLANE - 1u) % NLANE); held_step = -1; }
         if (b & (1u << BTN_OCT_UP)) { sel_lane = (uint8_t)((sel_lane + 1u) % NLANE); held_step = -1; }
@@ -1068,7 +1151,10 @@ static void app_main(void)
             char s[24];
             if (fm1_in.buttons & (1u << BTN_SEL)) {
                 if (playing) say("STOP TO LOAD");
-                else if (proj_load(set.slot)) say("EMPTY SLOT");
+                else if (proj_load(set.slot)) {   /* an empty slot: the demo with the slot's own kit */
+                    proj_new(&P, set.slot);
+                    put_s(put_s(s, "KIT "), KIT_NAME[set.slot % NKIT]); say(s); edit_pat = cur_pat = 0; next_pat = 0xFF;
+                }
                 else { put_u(put_s(s, "LOADED S"), set.slot + 1u); say(s); edit_pat = cur_pat = 0; next_pat = 0xFF; }
             } else if (playing) say("STOP TO SAVE");
             else {

@@ -1,0 +1,76 @@
+# the 8 starter kits (SEL + SAVE on each empty slot, a bar and a half each), then two random kits (SEL + HOME)
+# and SEL + GLO back to the first random one. tests/kalk_kit_check.sh measures it; the demo mp3 is this
+300 btndown 3
+350 btn 9
+400 btnup 3
+500 shot
+700 btn 12
+4700 btn 12
+5200 enc 6 1
+5300 btndown 3
+5350 btn 9
+5400 btnup 3
+5500 shot
+5700 btn 12
+9700 btn 12
+10200 enc 6 1
+10300 btndown 3
+10350 btn 9
+10400 btnup 3
+10500 shot
+10700 btn 12
+14700 btn 12
+15200 enc 6 1
+15300 btndown 3
+15350 btn 9
+15400 btnup 3
+15500 shot
+15700 btn 12
+19700 btn 12
+20200 enc 6 1
+20300 btndown 3
+20350 btn 9
+20400 btnup 3
+20500 shot
+20700 btn 12
+24700 btn 12
+25200 enc 6 1
+25300 btndown 3
+25350 btn 9
+25400 btnup 3
+25500 shot
+25700 btn 12
+29700 btn 12
+30200 enc 6 1
+30300 btndown 3
+30350 btn 9
+30400 btnup 3
+30500 shot
+30700 btn 12
+34700 btn 12
+35200 enc 6 1
+35300 btndown 3
+35350 btn 9
+35400 btnup 3
+35500 shot
+35700 btn 12
+39700 btn 12
+40300 btndown 3
+40350 btn 8
+40400 btnup 3
+40500 shot
+40700 btn 12
+44700 btn 12
+45300 btndown 3
+45350 btn 8
+45400 btnup 3
+45500 shot
+45700 btn 12
+49700 btn 12
+50300 btndown 3
+50350 btn 7
+50400 btnup 3
+50500 shot
+50700 btn 12
+54700 btn 12
+55200 end

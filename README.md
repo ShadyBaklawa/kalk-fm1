@@ -44,12 +44,12 @@ sit on the panel: each one's name, value and a bar. Along the top the slot, wher
 | **NOW** (F#5) | the remix, while held |
 | **PLAY** | start / stop. With MIDI clock (GLOBAL > SYNC MIDI): START / STOP from the clock, KALK follows its tempo and phase |
 | **REC** | XFX pages: record the pad's motion (X / Y) over 4 bars. SEL + REC: forget it. Holding a lane key: clear that lane. REMIX page: NOW on / off |
-| **HOME** | the selected lane's SOUND page |
+| **HOME** | the selected lane's SOUND page. **SEL + HOME**: a random kit (see below); **SEL + GLO**: swap back to the kit before |
 | **EDIT** | the selected lane's pages: SOUND, FILTER, SHAPE, MOD, EXTRA, LANE (again: next; SEL + EDIT: back) |
 | **FX** | the effects. Again: the next group (XFX, TORSION, FILTER, DELAY, REVERB, PULP, MASTER); SEL + FX: back |
 | **SEQ, ARP** | sequence, remix (again: next page; SEL + it: back). **GLO**: global, with the CPU meter |
 | **SELECT** | every page of the section, one by one. **K1-K4**: the four values along the bottom. **ALGORITHM**: tempo. **PRESETS**: the project slot (1-8) |
-| **SAVE** | save the project to the slot (stopped). **SEL + SAVE**: load it |
+| **SAVE** | save the project to the slot (stopped). **SEL + SAVE**: load it; an empty slot loads the demo with that slot's own kit |
 | **ENV / LFO** | mute / solo the selected lane |
 
 ## The voices
@@ -81,6 +81,27 @@ A sample plays through the voice's filter, SAT, pitch and envelope: DECAY holds 
 from [VCSL](https://github.com/sgossner/VCSL) by Versilian Studios. All CC0 1.0: `assets/samples-cc0/ATTRIBUTION.txt`.
 `tools/gen_samples.py` rebuilds the banks (8-bit mu-law, in the app's flash); `python3 tools/gen_vogel.py` renders
 the synthesised candidates to `build/vogel/` to audition.
+
+### Kits
+
+Each of the 8 slots starts, while it's empty, as the demo with its own kit (the WAV of KICK, SNARE, HAT, TIE, POD).
+Turn PRESETS to a slot and press SEL + SAVE: the top line names the kit.
+
+| Slot | Kit | KICK | SNARE | HAT | TIE | POD |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | CLASSIC (KALK's first sound) | SYN 1 | SYN 2 | SYN 1 | SYN 3 | SYN 1 |
+| 2 | ACOUSTIC | BDRUM | SNARE | HIHAT | COWBELL | CLAVES |
+| 3 | FM | FMTHUD | RINGSN | FMHAT | FMPING | ZAPFM |
+| 4 | CRUSH | CRSHKIK | CRSHSN | GRANHAT | CRSHPNG | BITBLIP |
+| 5 | COMB | COMBKIK | COMBSN | COMBHAT | RINGPNG | COMBCLK |
+| 6 | PERC | TUMBA | RIMSHOT | SHAKER | CONGA | TRIANGL |
+| 7 | SYNTH 2 | SYN 6 | SYN 10 | SYN 7 | SYN 11 | SYN 13 |
+| 8 | MIXED | LOG LO | CLAP | TAMB | KARPLUS | GLASS |
+
+**SEL + HOME** rolls a random kit, playing or not: every voice gets a new WAV (half the time a sample), TUNE, DECAY,
+filter and its own four knobs, within ranges that keep it a drum kit. The levels, patterns, MOD lane, effects and
+EXTRA pages stay. **SEL + GLO** swaps back to the kit before the last roll (press it again to swap forward). Like any
+change, SAVE keeps it.
 
 ### The EXTRA page (after MOD; TIE's LANE comes after it)
 

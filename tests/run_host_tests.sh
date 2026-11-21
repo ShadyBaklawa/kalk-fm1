@@ -17,5 +17,6 @@ run "the demo: patterns, NOW, an XFX sweep, the pages" sh tests/run_host.sh test
 run "MIDI: notes play the voices, a clock sets tempo and phase, start / stop" sh tests/kalk_midi_check.sh
 run "the panel: steps, accent, values, stretch, chain, copy, mute, open hat, motion, save / clear / load" \
     sh tests/kalk_ui_check.sh
+run "kits: each empty slot its own kit, random kits (SEL + HOME) bounded, SEL + GLO back" sh tests/kalk_kit_check.sh
 [ "$fail" = 0 ] && echo "HOST TESTS PASSED" || echo "SOME HOST TESTS FAILED"
 exit "$fail"
