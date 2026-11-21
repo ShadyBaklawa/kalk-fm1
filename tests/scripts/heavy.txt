@@ -1,20 +1,29 @@
-# the worst case: pattern C (dense hats), every effect on
+# the worst case: pattern C (dense hats), every effect on: XFX PITCH, TORSION SHRED, FILTER + FOLLOW, the delay with
+# RESON and its TAPE LFO, the reverb, PULP
 100 keys 0x100000
 200 keys 0
 300 btn 12
 400 btn 2
-500 enc 2 11
+500 enc 2 17
 600 enc 4 30
 700 btn 2
-800 enc 5 60
+750 enc 2 7
+800 btn 2
+850 enc 5 30
+860 enc 0 1
+870 enc 5 12
 900 btn 2
-1000 btn 2
-1100 enc 2 30
-1200 enc 3 30
-1300 btn 2
-1400 enc 2 10
-1500 enc 3 10
-1600 enc 5 10
-1700 btn 2
-1800 enc 5 30
+950 enc 5 20
+960 enc 0 1
+970 enc 4 1
+980 enc 0 1
+990 enc 2 30
+1000 enc 3 30
+1010 enc 0 1
+1020 enc 2 10
+1030 enc 3 10
+1100 btn 2
+1150 enc 5 20
+1200 btn 2
+1250 enc 5 30
 6000 end

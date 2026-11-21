@@ -99,13 +99,13 @@ static struct { uint8_t slot, ch, out, sync; uint32_t magic; } set;
 #define SET_MAGIC 0x4B53u
 
 /* ======================================================================== the parameters on the screen */
-enum { K_VP, K_FX, K_SQ, K_GL, K_SL, K_VX, K_F2, K_TOR };   /* (after 0.3: the EXTRA pages, fx2[]; TORSION) */          /* voice, effects, sequence, global, the selected second-window lane */
+enum { K_VP, K_FX, K_SQ, K_GL, K_SL, K_VX, K_F2, K_TOR, K_NONE };   /* (after 0.3: EXTRA pages, fx2[], TORSION; an empty knob) */          /* voice, effects, sequence, global, the selected second-window lane */
 enum { SQ_LEN, SQ_START, SQ_SWING, SQ_HALF, SQ_TLEN, SQ_PLEN, SQ_MLEN, SQ_STRETCH, SQ_CHAIN, SQ_SLOT, SQ_CPAT, SQ_BPM,
        SQ_RMX, SQ_RFREQ, SQ_RSHIFT, SQ_RLANES, SQ_R2DEPTH, SQ_R2RATE, SQ_R2SHAPE, SQ_GMODE, SQ_GRATE, SQ_GDEPTH,
        SQ_GSMOOTH, NSQ };
 enum { GL_BPM, GL_CH, GL_OUT, GL_SYNC };
 enum { SL_LEN, SL_STRETCH };
-enum { F_WAV, F_NUM, F_SEMI, F_MS, F_HZ, F_LIST, F_PAN, F_BIP, F_PLUS1, F_PCT, F_TICKS, F_MASK3, F_CHAIN, F_PAT, F_OMNI, F_LEN, F_RT, F_SPEED, F_GMS, F_OFFN, F_FMS, F_AUTOMS, F_BITS, F_SRATE };
+enum { F_WAV, F_NUM, F_SEMI, F_MS, F_HZ, F_LIST, F_PAN, F_BIP, F_PLUS1, F_PCT, F_TICKS, F_MASK3, F_CHAIN, F_PAT, F_OMNI, F_LEN, F_RT, F_SPEED, F_GMS, F_OFFN, F_FMS, F_AUTOMS, F_BITS, F_SRATE, F_XFX };
 typedef struct { uint8_t kind, idx; } pref_t;
 
 static const char *const LANE_LONG[NLANE] = {"KICK", "SNARE", "HAT", "TIE", "POD", "MOD"};
@@ -143,13 +143,18 @@ static const char *const L_R2RATE[] = {"1/4 BAR", "1/2 BAR", "1 BAR", "2 BAR", "
 static const char *const L_R2SHAPE[NR2] = {"SINE", "TRI", "SAW UP", "SAW DN", "SQUARE", "RANDOM", "DRUNK"};
 static const char *const L_GMODE[] = {"OFF", "PRE FX", "POST FX"};
 static const char *const L_HATMODE[] = {"NOISE", "808"};
-static const char *const L_TPRE[] = {"CUSTOM", "WARM", "LO-FI", "RADIO", "HOWL", "GRIT GRID", "RUBBER", "SHRED", "GHOST"};
+static const char *const L_TPRE[] = {"CUSTOM", "WARM", "LO-FI", "RADIO", "HOWL", "GRID", "RUBBER", "SHRED", "GHOST"};
 static const char *const L_TSTEP[] = {"1/32", "1/16", "1/8", "1/4"};
-static const char *const TOR_NAMES[NTOR] = {"BITS", "RATE", "DRIVE", "CUTOFF", "RES", "NOT>BP", "FDBK", "FOLD", "CLIP",
-                                            "SPREAD", "GATE", "LEVEL", "PRESET", "BLEND", "DEPTH", "LENGTH", "DENSTY",
+/* XFX: what X and Y do for each effect (the knobs say it) */
+static const char *const XFX_XY[NXF][2] = {
+    {"X", "Y"}, {"BITS", "S.RATE"}, {"CUTOFF", "RES"}, {"FREQ", "WOBBLE"}, {"TIME", "FDBK"}, {"LENGTH", "REPEAT"},
+    {"CUTOFF", "RES"}, {"CUTOFF", "RES"}, {"DRIVE", "BIAS"}, {"RATE", "DEPTH"}, {"RATE", "DEPTH"}, {"RATE", "DEPTH"},
+    {"LENGTH", "SHAPE"}, {"SIZE", "PATTRN"}, {"LOOP", "SPEED"}, {"SPEED", "DEPTH"}, {"CUTOFF", "RES"}, {"GRAIN", "PITCH"}};
+static const char *const TOR_NAMES[NTOR] = {"BITS", "S.RATE", "DRIVE", "CUTOFF", "RES", "NOT>BP", "FDBK", "FOLD", "CLIP",
+                                            "SPREAD", "N.GATE", "LEVEL", "PRESET", "BLEND", "DEPTH", "LENGTH", "DENSTY",
                                             "SEED", "STEP", "", "", "", "", ""};
 static const char *const L_BSRC[] = {"MIX", "KICK", "K+SN", "DRUMS"};
-static const char *const F2_NAMES[NFX2] = {"BEAT", "ATTACK", "RELEAS", "SOURCE", "LEVEL", "LO", "HI", "DECAY",
+static const char *const F2_NAMES[NFX2] = {"BEAT", "ATTACK", "RELEAS", "SOURCE", "LEVEL", "LO HZ", "HI HZ", "DECAY",
                                            "WAVE", "TRIG", "GLIDE", "PAN", "", "", "", ""};
 static const char *const L_GRATE[] = {"1/8", "1/16", "1/32"};
 static const char *const L_DLFO[] = {"1/16", "1/8", "1/4", "1/2", "1 BAR", "2 BAR", "4 BAR"};
@@ -175,33 +180,39 @@ static const pref_t PG_VX[4] = {{K_VX, 0}, {K_VX, 1}, {K_VX, 2}, {K_VX, 3}};
 static const char *const VX_NAMES[NVOICE][4] = {
     {"GRAIN", "SPEED", "SIZE", ""}, {"GRAIN", "SPEED", "SIZE", ""}, {"808", "TONE", "COLOR", "SNAP"},
     {"FM ATK", "FM DEC", "DROP", "NOISFM"}, {"", "", "", ""}};
-static const pref_t PG_LANE[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_SQ, SQ_SWING}, {K_SQ, SQ_LEN}};
+static const pref_t PG_LANE[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_NONE, 0}, {K_NONE, 0}};
 static const pref_t PG_MODL[4] = {{K_SL, SL_LEN}, {K_SL, SL_STRETCH}, {K_FX, FX_MODFX}, {K_FX, FX_FMOD}};
-#define NPG_FX 18u                              /* the FX pages (XFX is the first) */
+#define NPG_FX 19u                              /* the FX pages (XFX is the first) */
 static const pref_t PG_FX[NPG_FX][4] = {
-    {{K_FX, FX_XTYPE}, {K_FX, FX_X}, {K_FX, FX_Y}, {K_FX, FX_XAUTO}},
-    {{K_FX, FX_DL}, {K_FX, FX_DR}, {K_FX, FX_DFB}, {K_FX, FX_DSEND}},
-    {{K_FX, FX_DDAMP}, {K_FX, FX_DWIDTH}, {K_FX, FX_XMIX}, {K_FX, FX_MODFX}},
-    {{K_FX, FX_DFREQ}, {K_FX, FX_DRES}, {K_FX, FX_DFTYPE}, {K_FX, FX_DLO}},
-    {{K_FX, FX_DLFO}, {K_FX, FX_DDMOD}, {K_FX, FX_DFM}, {K_FX, FX_DINV}},
-    {{K_FX, FX_FCUT}, {K_FX, FX_FRES}, {K_FX, FX_FMOD}, {K_FX, FX_FTRK}},
-    {{K_FX, FX_EQLO}, {K_FX, FX_EQMID}, {K_FX, FX_EQHI}, {K_FX, FX_EQAMP}},
-    {{K_FX, FX_GAIN}, {K_FX, FX_PITCH}, {K_FX, FX_DIRT}, {K_FX, FX_NORM}},
-    {{K_FX, FX_RTIME}, {K_FX, FX_RSIZE}, {K_FX, FX_RDAMP}, {K_FX, FX_RSEND}},
-    {{K_FX, FX_RLOW}, {K_FX, FX_RMOD}, {K_FX, FX_RWIDTH}, {K_FX, FX_RDLY}},
-    {{K_F2, F2_BEAT}, {K_F2, F2_BATK}, {K_F2, F2_BREL}, {K_F2, F2_BSRC}},   /* (after 0.3) */
-    {{K_F2, F2_PLVL}, {K_F2, F2_PLO}, {K_F2, F2_PHI}, {K_F2, F2_PDEC}},
-    {{K_F2, F2_PWAVE}, {K_F2, F2_PTRIG}, {K_F2, F2_PGLIDE}, {K_F2, F2_PPAN}},
-    {{K_TOR, T_PRESET}, {K_TOR, T_DRIVE}, {K_TOR, T_BLEND}, {K_TOR, T_LEVEL}},   /* (after the 0.3 release) */
+    {{K_FX, FX_XTYPE}, {K_FX, FX_X}, {K_FX, FX_Y}, {K_FX, FX_XMIX}},                 /* XFX */
+    {{K_FX, FX_XAUTO}, {K_FX, FX_MODFX}, {K_NONE, 0}, {K_NONE, 0}},
+    {{K_TOR, T_PRESET}, {K_TOR, T_DRIVE}, {K_TOR, T_LEVEL}, {K_TOR, T_BLEND}},       /* TORSION */
     {{K_TOR, T_BITS}, {K_TOR, T_RATE}, {K_TOR, T_FOLD}, {K_TOR, T_CLIP}},
     {{K_TOR, T_CUT}, {K_TOR, T_RES}, {K_TOR, T_NBP}, {K_TOR, T_FDBK}},
     {{K_TOR, T_DEPTH}, {K_TOR, T_LEN}, {K_TOR, T_DENS}, {K_TOR, T_SEED}},
-    {{K_TOR, T_SPREAD}, {K_TOR, T_GATE}, {K_TOR, T_STEP}, {K_TOR, NTOR}},
+    {{K_TOR, T_SPREAD}, {K_TOR, T_GATE}, {K_TOR, T_STEP}, {K_NONE, 0}},
+    {{K_FX, FX_FCUT}, {K_FX, FX_FRES}, {K_FX, FX_FMOD}, {K_FX, FX_FTRK}},             /* FILTER */
+    {{K_F2, F2_BSRC}, {K_F2, F2_BATK}, {K_F2, F2_BREL}, {K_F2, F2_BEAT}},
+    {{K_FX, FX_DL}, {K_FX, FX_DR}, {K_FX, FX_DFB}, {K_FX, FX_DSEND}},                 /* DELAY */
+    {{K_FX, FX_DDAMP}, {K_FX, FX_DWIDTH}, {K_FX, FX_DINV}, {K_NONE, 0}},
+    {{K_FX, FX_DFREQ}, {K_FX, FX_DRES}, {K_FX, FX_DFTYPE}, {K_FX, FX_DLO}},
+    {{K_FX, FX_DLFO}, {K_FX, FX_DDMOD}, {K_FX, FX_DFM}, {K_NONE, 0}},
+    {{K_FX, FX_RTIME}, {K_FX, FX_RSIZE}, {K_FX, FX_RDAMP}, {K_FX, FX_RSEND}},         /* REVERB */
+    {{K_FX, FX_RLOW}, {K_FX, FX_RMOD}, {K_FX, FX_RWIDTH}, {K_FX, FX_RDLY}},
+    {{K_F2, F2_PLO}, {K_F2, F2_PHI}, {K_F2, F2_PDEC}, {K_F2, F2_PLVL}},              /* PULP */
+    {{K_F2, F2_PWAVE}, {K_F2, F2_PTRIG}, {K_F2, F2_PGLIDE}, {K_F2, F2_PPAN}},
+    {{K_FX, FX_EQLO}, {K_FX, FX_EQMID}, {K_FX, FX_EQHI}, {K_FX, FX_EQAMP}},          /* MASTER */
+    {{K_FX, FX_GAIN}, {K_FX, FX_PITCH}, {K_FX, FX_DIRT}, {K_FX, FX_NORM}},
 };
-static const char *const PG_FX_T[NPG_FX] = {"XFX", "DELAY", "DELAY 2", "RESON", "TAPE LFO", "FILTER", "EQ", "OUT", "REVERB",
-                                         "REVERB 2", "FOLLOW", "PULP", "PULP 2",
-                                         "TORSION", "TOR CRUSH", "TOR FILTER", "TOR ANIM", "TOR MORE"};
-#define PG_TOR_ANIM 16u                         /* TOR ANIM: the white keys pick what ANIM moves */
+static const char *const PG_FX_T[NPG_FX] = {"XFX", "XFX MOTION", "TORSION", "TOR CRUSH", "TOR FILTER", "TOR ANIM",
+                                         "TOR MORE", "FILTER", "FOLLOW", "DELAY", "DELAY 2", "RESON", "TAPE LFO",
+                                         "REVERB", "REVERB 2", "PULP", "PULP 2", "EQ", "OUT"};
+/* the groups: FX jumps from one's first page to the next one's, SEL + FX back */
+#define NFXG 7u
+static const uint8_t FXG[NFXG + 1u] = {0, 2, 7, 9, 13, 15, 17, NPG_FX};
+static uint32_t fx_group(uint32_t pg) { uint32_t g = 0; while (g + 1u < NFXG && pg >= FXG[g + 1u]) g++; return g; }
+#define PG_XFX_LAST 1u                          /* XFX, XFX MOTION: REC records the pad */
+#define PG_TOR_ANIM 5u                          /* TOR ANIM: the white keys pick what ANIM moves */
 static const pref_t PG_SEQ[3][4] = {
     {{K_SQ, SQ_LEN}, {K_SQ, SQ_START}, {K_SQ, SQ_SWING}, {K_SQ, SQ_HALF}},
     {{K_SQ, SQ_TLEN}, {K_SQ, SQ_PLEN}, {K_SQ, SQ_MLEN}, {K_SQ, SQ_STRETCH}},
@@ -235,8 +246,8 @@ static const pref_t *page_refs(void)
     switch (section) {
     case SEC_VOICE:
         if (sel_lane == L_MOD) return PG_MODL;
-        if (pg == npages() - 1u && VX_ON[voice_of_lane()]) return PG_VX;   /* (the EXTRA page is the last) */
-        return pg == 4u ? PG_LANE : PG_VOICE[pg];
+        if (pg < 4u) return PG_VOICE[pg];
+        return pg == 4u && VX_ON[voice_of_lane()] ? PG_VX : PG_LANE;   /* (EXTRA, then LANE) */
     case SEC_FX: return PG_FX[pg];
     case SEC_SEQ: return PG_SEQ[pg];
     case SEC_RMX: return PG_RMX[pg];
@@ -249,7 +260,8 @@ static const char *page_title(void)
     switch (section) {
     case SEC_VOICE:
         if (sel_lane == L_MOD) return "LANE";
-        return pg == npages() - 1u && VX_ON[voice_of_lane()] ? VX_T[voice_of_lane()] : PG_VOICE_T[pg];
+        if (pg < 4u) return PG_VOICE_T[pg];
+        return pg == 4u && VX_ON[voice_of_lane()] ? VX_T[voice_of_lane()] : "LANE";
     case SEC_FX: return PG_FX_T[pg];
     case SEC_SEQ: return PG_SEQ_T[pg];
     case SEC_RMX: return PG_RMX_T[pg];
@@ -287,6 +299,8 @@ static pval_t pval(pref_t r)
         v.name = FX_NAMES[r.idx];
         switch (r.idx) {
         case FX_XTYPE: v.max = NXF - 1; v.fmt = F_LIST; v.list = L_XFX; break;
+        case FX_X: case FX_Y: v.name = XFX_XY[P.fx[FX_XTYPE] < NXF ? P.fx[FX_XTYPE] : 0][r.idx == FX_Y]; v.fmt = F_XFX; break;
+        case FX_XMIX: v.name = "MIX"; v.fmt = F_OFFN; break;
         case FX_XAUTO: v.max = 2; v.fmt = F_LIST; v.list = L_MOTION; break;
         case FX_DL: case FX_DR: v.max = 16; v.fmt = F_TICKS; break;   /* 0: CHORUS (a few ms) */
         case FX_MODFX: v.max = 3; v.fmt = F_LIST; v.list = L_MODFX; break;
@@ -462,6 +476,20 @@ static void fmt_val(const pval_t *v, char *d)
         else put_u(d, hz);
         break;
     }
+    case F_XFX: {                               /* XFX's X / Y, in the chosen effect's terms where it helps */
+        static const char *const SL[3] = {"1/32", "1/16", "1/8"};
+        static const char *const FZ[6] = {"1/64", "1/32", "1/16", "1/8", "3/16", "1/4"};
+        static const char *const SP[5] = {"1/16", "1/8", "1/4", "1/2", "1 BAR"};
+        uint32_t t = P.fx[FX_XTYPE], isy = v->p == &P.fx[FX_Y];
+        if (t == XF_SLICE) { if (isy) { d = put_s(d, "PAT "); put_u(d, (uint32_t)x / 8u + 1u); } else put_s(d, SL[x * 3 / 128]); }
+        else if (t == XF_FREEZE) { if (isy) put_i(d, x - 64); else put_s(d, x < 16 ? "OFF" : FZ[(x - 16) * 6 / 112]); }
+        else if (t == XF_PITCH) { if (isy) put_i(d, ((x * 25) >> 7) - 12); else { d = put_u(d, (512u + (uint32_t)x * 28u) / 44u); put_s(d, "ms"); } }
+        else if (t == XF_SPIN && !isy) put_s(d, SP[x * 5 / 128]);
+        else if (t == XF_CHOP && !isy) { d = put_u(d, (10u + (uint32_t)x * 246u / 127u) * 100u / 256u); put_s(d, "%"); }
+        else if (t == XF_REPEAT && isy) put_s(d, x >= 64 ? "ON" : "OFF");
+        else put_u(d, (uint32_t)x);
+        break;
+    }
     case F_AUTOMS:                              /* 0: as the voice's DECAY has it */
         if (!x) { put_s(d, "AUTO"); break; }
         { uint32_t ms = DECAY_MS[x & 127];
@@ -493,13 +521,16 @@ static uint32_t gate_pos(void)                  /* the GATE's step now (as kalk_
 
 /* ---- the screen: a lime slice. Six rings, one a lane (the kick outside), each cut into as many wedges as its lane
  * has steps, so a 5-step pod turns against a 16-step kick; the peel is the playhead's track (purple while the remix
- * plays); the pattern in the middle; the four knobs in the corners; the page or a message along the bottom. */
+ * plays); the pattern in the middle. Along the top the slot, where we are (or a message) and the tempo; along the
+ * bottom the four knobs, K1..K4 left to right as they sit on the panel. */
 #define R2(r) (4u * (r) * (r))                  /* radii as the pixel loop measures them: (2dx+1)^2 + (2dy+1)^2 */
-static const uint8_t RING_OUT[NLANE] = {98, 87, 76, 65, 54, 43};
-static const uint8_t RING_IN[NLANE] = {88, 77, 66, 55, 44, 33};
-#define R_PEEL 104u
-#define R_PITH 99u
-#define R_CORE 31u
+static const uint8_t RING_OUT[NLANE] = {85, 75, 66, 56, 47, 37};
+static const uint8_t RING_IN[NLANE] = {76, 67, 57, 48, 39, 29};
+#define R_PEEL 90u
+#define R_PITH 86u
+#define R_CORE 27u
+#define SCR_CY 104u                             /* the slice's centre (x 120): up, so the knobs fit under it */
+#define KNOB_Y 197                              /* the knobs' names; their values under them, then their bars */
 
 static uint16_t col_scale(uint16_t c, uint32_t pct)   /* pct 0..100 */
 {
@@ -517,17 +548,32 @@ static uint16_t col_mix(uint16_t c, uint16_t d, uint32_t pct)   /* pct of d */
 static int8_t held_step = -1;                   /* a white key held on tie / pod / mod: K1 edits it */
 static uint32_t cpu_pct;                        /* the render's share of its 5.8 ms, worst of the last second */
 
-static void corner(uint32_t k, const char *name, const char *val, int32_t frac64, uint16_t tint)
+static void knob_cell(uint32_t k, const char *name, const char *val, int32_t frac64, uint16_t tint)
 {
-    /* K1 top left, K2 top right, K3 bottom left, K4 bottom right */
-    int32_t right = k & 1u, bottom = k >> 1, w;
-    int32_t yl = bottom ? 205 : 1, yv = bottom ? 222 : 17, yb = bottom ? 201 : 35;
+    /* K1..K4 left to right, 60 px each: the name, the value, a bar */
+    int32_t x0 = (int32_t)k * 60, w;
     w = text_w(&FONT_S, name);
-    cv_text(right ? 237 - w : 3, yl, &FONT_S, name, C_GREY);
+    cv_text(x0 + 30 - w / 2, KNOB_Y, &FONT_S, name, C_GREY);
     w = text_w(&FONT_S, val);
-    cv_text(right ? 237 - w : 3, yv, &FONT_S, val, C_WHITE);
-    cv_rect(right ? 193 : 3, yb, 44, 3, C_DARK);
-    if (frac64 > 0) cv_rect(right ? 237 - frac64 * 44 / 64 : 3, yb, frac64 * 44 / 64, 3, tint);
+    cv_text(x0 + 30 - w / 2, KNOB_Y + 17, &FONT_S, val, C_WHITE);
+    cv_rect(x0 + 5, KNOB_Y + 36, 50, 3, C_DARK);
+    if (frac64 > 0) cv_rect(x0 + 5, KNOB_Y + 36, frac64 * 50 / 64, 3, tint);
+}
+
+/* TOR ANIM: the white keys 1..12 are TORSION's first 12 knobs; a box each, orange when ANIM moves it */
+static void anim_grid(void)
+{
+    static const char *const AB[NT_ANIM] = {"BITS", "S.RATE", "DRIVE", "CUTOFF", "RES", "NOT>BP", "FDBK", "FOLD",
+                                            "CLIP", "SPREAD", "N.GATE", "LEVEL"};
+    uint32_t i, m = anim_mask();
+    char t[12];
+    for (i = 0; i < NT_ANIM; i++) {
+        int32_t x = 8 + (int32_t)(i % 3u) * 76, y = 16 + (int32_t)(i / 3u) * 44, on = (int32_t)(m >> i & 1u);
+        cv_rect(x, y, 72, 40, on ? RGB(255, 140, 30) : RGB(40, 28, 16));
+        put_u(t, i + 1u);
+        cv_text(x + 4, y + 2, &FONT_S, t, on ? C_BLACK : C_GREY);
+        cv_text(x + 36 - text_w(&FONT_S, AB[i]) / 2, y + 20, &FONT_S, AB[i], on ? C_BLACK : C_WHITE);
+    }
 }
 
 static void draw_screen(void)
@@ -597,15 +643,15 @@ static void draw_screen(void)
     for (strip = 0; strip < 3u; strip++) {
         uint32_t y0 = strip * 80u, y, x;
         cv_begin(240, 80, C_BLACK);
-        for (y = y0; y < y0 + 80u; y++) {
-            uint32_t ay = y < 120u ? 119u - y : y - 120u, sy = (2u * ay + 1u) * (2u * ay + 1u);
+        for (y = y0; y < y0 + 80u && !anim_edit(); y++) {
+            uint32_t ay = y < SCR_CY ? SCR_CY - 1u - y : y - SCR_CY, sy = (2u * ay + 1u) * (2u * ay + 1u);
             uint16_t *row = cv_px + (y - y0) * 240u;
             if (sy >= R2(R_PEEL)) continue;
             for (x = 0; x < 240u; x++) {
                 uint32_t ax = x < 120u ? 119u - x : x - 120u, d2 = (2u * ax + 1u) * (2u * ax + 1u) + sy, q, ang, k;
                 if (d2 >= R2(R_PEEL)) continue;
                 q = ANG_Q[ay * 120u + ax];
-                ang = x >= 120u ? (y < 120u ? q : 2048u - q) : (y < 120u ? 4095u - q : 2048u + q);   /* 0..4095 from 12 o'clock */
+                ang = x >= 120u ? (y < SCR_CY ? q : 2048u - q) : (y < SCR_CY ? 4095u - q : 2048u + q);   /* 0..4095 from 12 o'clock */
                 if (d2 >= R2(R_PITH)) {         /* the peel, and the hand on it */
                     row[x] = (playing && ((ang * len) >> 12) == ui_pos) ? hand : peel;
                     continue;
@@ -625,6 +671,7 @@ static void draw_screen(void)
             }
         }
         cv_oy = -(int32_t)y0;                   /* the texts in screen coordinates, clipped to this strip */
+        if (anim_edit()) anim_grid();
         /* the knobs */
         {
             uint32_t k;
@@ -632,24 +679,24 @@ static void draw_screen(void)
                 pval_t v = pval(r[k]);
                 if (held_step >= 0 && k == 0u && sel_lane >= L_TIE) {
                     int32_t sv = P.val[sel_lane - NMAIN][held_step];
-                    put_u(put_s(a, "STEP "), (uint32_t)held_step + 1u);
+                    put_u(put_s(a, sel_lane == L_MOD ? "VAL " : "NOTE "), (uint32_t)held_step + 1u);   /* K1: the held step */
                     if (sel_lane == L_MOD) put_u(b, (uint32_t)sv); else put_i(b, sv);
-                    corner(0, a, b, sel_lane == L_MOD ? sv * 64 / 15 : (sv + 12) * 64 / 24, tint);
+                    knob_cell(0, a, b, sel_lane == L_MOD ? sv * 64 / 15 : (sv + 12) * 64 / 24, tint);
                     continue;
                 }
                 if (!v.p) continue;
                 fmt_val(&v, b);
-                corner(k, v.name, b, v.max > v.min ? (pget(&v) - v.min) * 64 / (v.max - v.min) : 0, tint);
+                knob_cell(k, v.name, b, v.max > v.min ? (pget(&v) - v.min) * 64 / (v.max - v.min) : 0, tint);
             }
         }
-        /* the top: the slot and the tempo */
+        /* the top: the slot (left), the tempo (right), where we are or a message (between) */
         {
             char *d = put_s(a, "S");
-            d = put_u(d, set.slot + 1u);
-            d = put_s(d, "  ");
-            d = put_u(d, P.bpm);
+            put_u(d, set.slot + 1u);
+            cv_text(3, 0, &FONT_S, a, C_GREY);
+            d = put_u(a, P.bpm);
             if (P.half) put_s(d, "/2");
-            cv_text(120 - text_w(&FONT_S, a) / 2, 0, &FONT_S, a, C_GREY);
+            cv_text(237 - text_w(&FONT_S, a), 0, &FONT_S, a, C_GREY);
         }
         /* the core: the pattern (or the held step's value), the chain under it */
         {
@@ -663,15 +710,15 @@ static void draw_screen(void)
                 else if (edit_pat != cur_pat && playing) { *d++ = '/'; *d++ = (char)('A' + edit_pat); }
                 *d = 0;
             }
-            cv_text(120 - text_w(&FONT_L, a) / 2, 99, &FONT_L, a, held_step >= 0 && sel_lane >= L_TIE ? LANE_COL[sel_lane] : C_LIME);
-            if (P.chain_len >= 2u && !(held_step >= 0)) {
+            if (!anim_edit()) cv_text(120 - text_w(&FONT_L, a) / 2, (int32_t)SCR_CY - 21, &FONT_L, a, held_step >= 0 && sel_lane >= L_TIE ? LANE_COL[sel_lane] : C_LIME);
+            if (P.chain_len >= 2u && !(held_step >= 0) && !anim_edit()) {
                 d = put_u(b, ui_chain + 1u);
                 d = put_s(d, "/");
                 put_u(d, P.chain_len);
-                cv_text(120 - text_w(&FONT_S, b) / 2, 129, &FONT_S, b, RGB(140, 170, 80));
+                cv_text(120 - text_w(&FONT_S, b) / 2, (int32_t)SCR_CY + 9, &FONT_S, b, RGB(140, 170, 80));
             }
         }
-        /* the bottom: a message, or where we are */
+        /* the top, between: where we are (section, page, its number), or a message */
         {
             uint16_t c = C_WHITE;
             char *d = a;
@@ -680,11 +727,14 @@ static void draw_screen(void)
                 if (section == SEC_VOICE) { d = put_s(d, LANE_LONG[sel_lane]); c = LANE_COL[sel_lane]; }
                 else d = put_s(d, SEC_NAME[section]);
                 if (*page_title()) { d = put_s(d, " "); d = put_s(d, page_title()); }
-                if (npages() > 1u) { d = put_s(d, " "); d = put_u(d, page[section] % npages() + 1u); d = put_s(d, "/"); d = put_u(d, npages()); }
+                if (section == SEC_FX) {        /* FX: the page in its group */
+                    uint32_t pg = page[SEC_FX] % NPG_FX, g = fx_group(pg), n = FXG[g + 1u] - FXG[g];
+                    if (n > 1u) { d = put_s(d, " "); d = put_u(d, pg - FXG[g] + 1u); d = put_s(d, "/"); d = put_u(d, n); }
+                } else if (npages() > 1u) { d = put_s(d, " "); d = put_u(d, page[section] % npages() + 1u); d = put_s(d, "/"); d = put_u(d, npages()); }
                 if (section == SEC_GLO) { d = put_s(d, " CPU "); d = put_u(d, cpu_pct); put_s(d, "%"); }
-                if (section == SEC_FX && page[SEC_FX] % NPG_FX == 0u && xy_rec) { put_s(a, "REC MOTION"); c = RGB(255, 70, 70); }
+                if (section == SEC_FX && page[SEC_FX] % NPG_FX <= PG_XFX_LAST && xy_rec) { put_s(a, "REC MOTION"); c = RGB(255, 70, 70); }
             }
-            cv_text(120 - text_w(&FONT_S, a) / 2, 224, &FONT_S, a, c);
+            cv_text(120 - text_w(&FONT_S, a) / 2, 0, &FONT_S, a, c);
         }
         cv_oy = 0;
         cv_blit(0, y0);
@@ -879,6 +929,16 @@ static int proj_load(uint32_t slot)
 }
 
 /* ======================================================================== the main loop */
+/* a section's button: into it (where it was left), pressed again its next page, with SEL its page before */
+static void section_button(uint32_t sec, uint32_t back)
+{
+    if (section == sec) {
+        uint32_t n = npages();
+        page[sec] = (uint8_t)((page[sec] % n + (back ? n - 1u : 1u)) % n);
+    }
+    section = (uint8_t)sec;
+}
+
 static void encoders(void)
 {
     const pref_t *r = page_refs();
@@ -948,8 +1008,7 @@ static void app_main(void)
                 else if (black_lane(k) >= 0) {
                     uint32_t l = (uint32_t)black_lane(k);
                     if (sel_lane != l) held_step = -1;
-                    sel_lane = (uint8_t)l;
-                    section = SEC_VOICE;
+                    sel_lane = (uint8_t)l;   /* (the page stays: HOME / EDIT for its sound) */
                     if (!playing && l != L_MOD) trig_push(l, 0, 0);   /* stopped: hear it */
                 } else if (black_pat(k) >= 0) select_pattern((uint32_t)black_pat(k));
                 else if (k == BK_NOW) now_held = 1;
@@ -965,14 +1024,23 @@ static void app_main(void)
         /* ---- buttons */
         b = fm1_input_edges(&rel);
         if (b & (1u << BTN_PLAY)) { ext_run = 0; if (playing) { stop_req = 1; xy_rec = 0; } else play_req = 1; }
-        if (b & (1u << BTN_HOME) || b & (1u << BTN_EDIT)) {
-            if (section == SEC_VOICE) page[SEC_VOICE] = (uint8_t)((page[SEC_VOICE] + 1u) % npages());
-            section = SEC_VOICE;
+        {
+            uint32_t back = (fm1_in.buttons >> BTN_SEL) & 1u;   /* SEL held: back */
+            if (b & (1u << BTN_HOME)) { section = SEC_VOICE; page[SEC_VOICE] = 0; }   /* HOME: the lane's SOUND */
+            if (b & (1u << BTN_EDIT)) section_button(SEC_VOICE, back);   /* EDIT: through the lane's pages */
+            if (b & (1u << BTN_FX)) {
+                if (section == SEC_FX) {         /* FX again: the next group's first page (SEL: the one before) */
+                    uint32_t g = fx_group(page[SEC_FX] % NPG_FX);
+                    if (back) g = page[SEC_FX] % NPG_FX != FXG[g] ? g : (g + NFXG - 1u) % NFXG;
+                    else g = (g + 1u) % NFXG;
+                    page[SEC_FX] = FXG[g];
+                }
+                section = SEC_FX;
+            }
+            if (b & (1u << BTN_SEQ)) section_button(SEC_SEQ, back);
+            if (b & (1u << BTN_ARP)) section_button(SEC_RMX, back);
+            if (b & (1u << BTN_GLO)) section = SEC_GLO;
         }
-        if (b & (1u << BTN_FX)) { if (section == SEC_FX) page[SEC_FX] = (uint8_t)((page[SEC_FX] + 1u) % NPG_FX); section = SEC_FX; }
-        if (b & (1u << BTN_SEQ)) { if (section == SEC_SEQ) page[SEC_SEQ] = (uint8_t)((page[SEC_SEQ] + 1u) % 3u); section = SEC_SEQ; }
-        if (b & (1u << BTN_ARP)) section = SEC_RMX;
-        if (b & (1u << BTN_GLO)) section = SEC_GLO;
         if (b & (1u << BTN_OCT_DOWN)) { sel_lane = (uint8_t)((sel_lane + NLANE - 1u) % NLANE); held_step = -1; }
         if (b & (1u << BTN_OCT_UP)) { sel_lane = (uint8_t)((sel_lane + 1u) % NLANE); held_step = -1; }
         if (b & (1u << BTN_ENV)) { P.mute ^= (uint8_t)(1u << sel_lane); say(P.mute >> sel_lane & 1u ? "MUTE" : "UNMUTE"); }
@@ -984,7 +1052,7 @@ static void app_main(void)
                 uint32_t s;
                 for (s = 0; s < NSTEP; s++) *lane_step((uint32_t)lane_key, s) = 0;
                 say("CLEARED");
-            } else if (section == SEC_FX && page[SEC_FX] % NPG_FX == 0u) {
+            } else if (section == SEC_FX && page[SEC_FX] % NPG_FX <= PG_XFX_LAST) {
                 if (fm1_in.buttons & (1u << BTN_SEL)) {   /* SEL + REC: forget the motion */
                     for (k = 0; k < NXY; k++) P.xy[k][0] = P.xy[k][1] = 255;
                     xy_rec = 0;
@@ -1010,6 +1078,15 @@ static void app_main(void)
             }
         }
         encoders();
+        {                                       /* the pages where the white keys aren't steps: say so on the way in */
+            static uint32_t last_pg = ~0u;
+            uint32_t here = section * 64u + page[section] % npages();
+            if (here != last_pg) {
+                if (gate_edit()) say("WHITE KEYS: GATE");
+                else if (anim_edit()) say("WHITE KEYS: ANIM");
+                last_pg = here;
+            }
+        }
         midi_in();
 
         /* ---- the effects' pad: the knobs, or the recorded motion */

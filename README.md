@@ -7,13 +7,13 @@ their own lengths, 127 remix variations, an XY effect with recorded motion, a te
 *Kalk* is lime, the stone. KALK is an independent work: no code, samples or artwork of
 Limelite are in it. The sounds are synthesised, or CC0 recordings from Versilian Studios' VCSL.
 
-<p align="center"><img src="docs/screen.png" width="240" alt="KALK's screen: a lime slice of six rings, one a lane, the pattern in the middle, the knobs in the corners"></p>
+<p align="center"><img src="docs/screen.png" width="240" alt="KALK's screen: a lime slice of six rings, one a lane, the pattern in the middle, the four knobs along the bottom"></p>
 
 **The screen is a lime slice.** Six rings, one a lane: KICK outside, then SNARE, HAT, TIE, POD, MOD. Each ring is cut
 into as many wedges as its lane has steps, so a 5-step POD visibly turns against a 16-step kick. Lit wedges are steps,
 a white edge an accent, a hollow wedge an open hat; the selected lane glows. The peel is the playhead's track, purple
-while the remix plays. The pattern sits in the middle; the four knobs in the corners (K1 top left, K2 top right, K3
-bottom left, K4 bottom right); the page, or a message, along the bottom.
+while the remix plays. The pattern sits in the middle. Along the bottom the four knobs, K1 to K4 left to right as they
+sit on the panel: each one's name, value and a bar. Along the top the slot, where you are (or a message) and the tempo.
 
 > **Status: 0.2, untested on hardware.** Everything below runs and is tested on the host (the real firmware source,
 > compiled for a computer: sound, screen, keys, MIDI). The first install on an FM-1 is the test that is still missing.
@@ -37,16 +37,18 @@ bottom left, K4 bottom right); the page, or a message, along the bottom.
 
 | | |
 | --- | --- |
-| **white key** | tap: step on / off. Hold (350 ms): accent. **SEL** + tap on HAT: open hat |
-| **TIE / POD / MOD step** | hold it and turn **K1**: its value (TIE, POD: -12..+12 semitones; MOD: 1..15) |
-| **lane key** | select the lane (stopped: you hear it). **OCT- / OCT+**: previous / next lane |
+| **white key** | tap: step on / off. Hold (350 ms): accent. **SEL** + tap on HAT: open hat. On REMIX > GATE and TORSION > ANIM the white keys do that page's job (the top line says so) |
+| **TIE / POD / MOD step** | hold it and turn **K1** (it shows NOTE / VAL): its value (TIE, POD: -12..+12 semitones; MOD: 1..15) |
+| **lane key** | choose the lane (stopped: you hear it); you stay on the page you're on. **OCT- / OCT+**: previous / next lane |
 | **A B C D** | the pattern: playing, it changes at the end of the bar. Hold one and press another: copy |
 | **NOW** (F#5) | the remix, while held |
 | **PLAY** | start / stop. With MIDI clock (GLOBAL > SYNC MIDI): START / STOP from the clock, KALK follows its tempo and phase |
-| **REC** | XFX page: record the pad's motion (X / Y) over 4 bars. SEL + REC: forget it. Holding a lane key: clear that lane. REMIX page: NOW on / off |
-| **HOME / EDIT** | the selected lane's sound (again: next page) |
-| **FX, SEQ, ARP, GLO** | effects, sequence, remix, global (again: next page) |
-| **SELECT** | the page. **K1-K4**: the four values on the screen. **ALGORITHM**: tempo. **PRESETS**: the project slot (1-8) |
+| **REC** | XFX pages: record the pad's motion (X / Y) over 4 bars. SEL + REC: forget it. Holding a lane key: clear that lane. REMIX page: NOW on / off |
+| **HOME** | the selected lane's SOUND page |
+| **EDIT** | the selected lane's pages: SOUND, FILTER, SHAPE, MOD, EXTRA, LANE (again: next; SEL + EDIT: back) |
+| **FX** | the effects. Again: the next group (XFX, TORSION, FILTER, DELAY, REVERB, PULP, MASTER); SEL + FX: back |
+| **SEQ, ARP** | sequence, remix (again: next page; SEL + it: back). **GLO**: global, with the CPU meter |
+| **SELECT** | every page of the section, one by one. **K1-K4**: the four values along the bottom. **ALGORITHM**: tempo. **PRESETS**: the project slot (1-8) |
 | **SAVE** | save the project to the slot (stopped). **SEL + SAVE**: load it |
 | **ENV / LFO** | mute / solo the selected lane |
 
@@ -80,7 +82,7 @@ from [VCSL](https://github.com/sgossner/VCSL) by Versilian Studios. All CC0 1.0:
 `tools/gen_samples.py` rebuilds the banks (8-bit mu-law, in the app's flash); `python3 tools/gen_vogel.py` renders
 the synthesised candidates to `build/vogel/` to audition.
 
-### The EXTRA page (the last of a voice's pages)
+### The EXTRA page (after MOD; TIE's LANE comes after it)
 
 | | K1 | K2 | K3 | K4 |
 | --- | --- | --- | --- | --- |
@@ -93,42 +95,49 @@ At GRAIN OFF and SPEED 100 % the sample plays as before. A project saved by 0.2 
 ## The sequence
 
 - **Main**: KICK, SNARE, HAT in patterns A-D. SEQ > MAIN: LEN 1-16, START, SWING, HALF (half tempo).
-- **Second window**: TIE, POD, MOD each loop on their own length (SEQ > LANES, or the lane's LANE page). STRTCH fits a
+- **Second window**: TIE, POD, MOD each loop on their own length (SEQ > LANES, or the lane's LANE page: LEN, STRTCH). STRTCH fits a
   lane to the main length: a lane of 3 plays 3 even steps across the bar.
 - **Chain**: SEQ > CHAIN: 2-8 bars of A-D in any order (SLOT, PATT).
 - **Remix** (ARP): REMIX 1-127 picks a variation of the main lanes (turned, backwards, half and double time, stutters,
   beats shuffled, holes, scattered); EVERY plays it every 8th / 4th / 2nd / every bar; SHIFT moves its start; LANES
   which of K S H it touches. NOW plays it while held.
-- **Remix LFO** (ARP, page 2): DEPTH 0-15 steps that an LFO pushes the play position of the main lanes ahead or back
+- **Remix LFO** (ARP again): DEPTH 0-15 steps that an LFO pushes the play position of the main lanes ahead or back
   (steps get skipped, repeated, played backwards); RATE 1/4 bar .. 8 bars; SHAPE SINE, TRI, SAW UP, SAW DN, SQUARE,
   RANDOM (a new jump every step), DRUNK (a step at a time); LANES as above. DEPTH 0: off.
-- **Gate** (ARP, page 3): a 16-step lane that cuts the sound on its steps, while playing. On this page the white keys
+- **Gate** (ARP a third time): a 16-step lane that cuts the sound on its steps, while playing. On this page the white keys
   are its steps and the inner ring shows them in red. GATE: OFF, PRE FX (the echoes and the reverb ring on through the
   cuts) or POST FX (hard cuts); RATE 1/8, 1/16 or 1/32 (the 16 steps then run twice a bar: stutters); DEPTH (how much
   it cuts); SMOOTH (the edge: 0 clicks, higher is softer).
 
 ## The effects
 
-| Page | K1 | K2 | K3 | K4 |
-| --- | --- | --- | --- | --- |
-| XFX | the effect | X | Y | MOTION: OFF, PLAY, SMOOTH |
-| DELAY | L (16ths; 0: CHORUS, ~8 ms) | R (16ths; 0: CHORUS) | FDBK | SEND |
-| DELAY 2 | DAMP | WIDTH (cross feedback: ping-pong) | XMIX (XFX dry / wet) | MOD>FX: the mod lane GATEs XFX, sets its MIX or its X |
-| RESON | FREQ (the filter in the echoes' loop) | RES | FILT (LP, BP, HP) | LO CUT (going in) |
-| TAPE LFO | LFO (1/16 .. 4 bars, synced; L and R a quarter apart) | DMOD (on the time: wobble, or a flanger at 0) | FM (on the cutoff) | INVERT (the feedback) |
-| FILTER | CUT | RES | MOD (the mod lane) | TRK (follows the level) |
-| EQ | LO | MID | HI | AMP |
-| OUT | GAIN | PITCH (+-12, all voices) | DIRT | NORM (the maximiser) |
-| REVERB | TIME (RT60 0.12-21.6 s) | SIZE | DAMP (the highs die first) | SEND (from the mix) |
-| REVERB 2 | LOW (cuts the lows going in: keeps the kick dry) | MOD (wobble, for a metallic shimmer) | WIDTH (0: mono) | DLY>RV (the echoes into the reverb) |
-| FOLLOW | BEAT: the beat moves the FILTER's cutoff: over 0 the hits open it, under 0 they close it (0: off) | ATTACK | RELEASE | SOURCE: MIX, KICK, K+SN, DRUMS |
-| PULP | LEVEL (OFF: off) | LO | HI (the pitch it listens for) | DECAY |
-| PULP 2 | WAVE (sine, triangle, square) | TRIG: what strikes it: MIX (its onsets), KICK, K+SN, DRUMS | GLIDE (how fast it follows the pitch) | PAN |
-| TORSION | PRESET: WARM, LO-FI, RADIO, HOWL, GRIT GRID, RUBBER, SHRED, GHOST (sets the knobs; the SEED stays) | DRIVE | BLEND (OFF: off) | LEVEL (64: 1x) |
-| TOR CRUSH | BITS (16 .. 2) | RATE (the sample rate it holds to) | FOLD | CLIP |
-| TOR FILTER | CUTOFF | RES | NOT>BP (from a notch to a band pass) | FDBK (the end back into the filter: it howls) |
-| TOR ANIM | DEPTH (how far ANIM moves them, under or over the knob) | LENGTH (1-64 steps) | DENSTY (how many steps bring a new value) | SEED (which random sequence: the same every time) |
-| TOR MORE | SPREAD (stereo from mono) | GATE (shuts under it) | STEP (1/32 .. 1/4) | |
+FX's pages come in seven groups, in the order you'd reach for them; FX jumps to the next group. On each effect's first
+page **K4 is how much of it, and 0 is off** (XFX MIX, TORSION BLEND, FOLLOW BEAT, DELAY SEND, REVERB SEND, PULP LEVEL).
+
+| Group | Page | K1 | K2 | K3 | K4 |
+| --- | --- | --- | --- | --- | --- |
+| XFX | XFX | the effect | X: named for the effect | Y: named for the effect | MIX (dry / wet; OFF: off) |
+| | XFX MOTION | MOTION: OFF, PLAY, SMOOTH | MOD>FX: the mod lane GATEs XFX, sets its MIX or its X | | |
+| TORSION | TORSION | PRESET: WARM, LO-FI, RADIO, HOWL, GRID, RUBBER, SHRED, GHOST (sets the knobs; the SEED stays) | DRIVE | LEVEL (64: 1x) | BLEND (OFF: off) |
+| | TOR CRUSH | BITS (16 .. 2) | S.RATE (the sample rate it holds to) | FOLD | CLIP |
+| | TOR FILTER | CUTOFF | RES | NOT>BP (from a notch to a band pass) | FDBK (the end back into the filter: it howls) |
+| | TOR ANIM | DEPTH (how far ANIM moves them, under or over the knob) | LENGTH (1-64 steps) | DENSTY (how many steps bring a new value) | SEED (which random sequence: the same every time) |
+| | TOR MORE | SPREAD (stereo from mono) | N.GATE (a noise gate: shuts under it) | STEP (1/32 .. 1/4) | |
+| FILTER | FILTER | CUT | RES | MOD (the mod lane) | TRK (follows the level) |
+| | FOLLOW | SOURCE: MIX, KICK, K+SN, DRUMS | ATTACK | RELEAS | BEAT: the beat moves CUT: over 0 the hits open it, under 0 they close it (0: off) |
+| DELAY | DELAY | L (16ths; 0: CHORUS, ~8 ms) | R (16ths; 0: CHORUS) | FDBK | SEND |
+| | DELAY 2 | DAMP | WIDTH (cross feedback: ping-pong) | INVERT (the feedback) | |
+| | RESON | FREQ (the filter in the echoes' loop) | RES | FILT (LP, BP, HP) | LO CUT (going in) |
+| | TAPE LFO | LFO (1/16 .. 4 bars, synced; L and R a quarter apart) | DMOD (on the time: wobble, or a flanger at 0) | FM (on the cutoff) | |
+| REVERB | REVERB | TIME (RT60 0.12-21.6 s) | SIZE | DAMP (the highs die first) | SEND (from the mix) |
+| | REVERB 2 | LOW (cuts the lows going in: keeps the kick dry) | MOD (wobble, for a metallic shimmer) | WIDTH (0: mono) | DLY>RV (the echoes into the reverb) |
+| PULP | PULP | LO HZ | HI HZ (the pitch it listens for) | DECAY | LEVEL (OFF: off) |
+| | PULP 2 | WAVE (sine, triangle, square) | TRIG: what strikes it: MIX (its onsets), KICK, K+SN, DRUMS | GLIDE (how fast it follows the pitch) | PAN |
+| MASTER | EQ | LO | MID | HI | AMP |
+| | OUT | GAIN | PITCH (+-12, all voices) | DIRT | NORM (the maximiser) |
+
+On TOR ANIM the screen shows TORSION's first 12 knobs as boxes, one per white key: a key turns its box orange, and ANIM
+moves it.
 
 The delay is a tape-style reson delay: with RESON and TAPE LFO at rest it is the plain delay, and once the filter is in,
 the echoes are soft-limited, so high RES and FDBK ring and sing rather than clip.
@@ -136,25 +145,25 @@ the echoes are soft-limited, so high RES and FDBK ring and sing rather than clip
 The reverb is a feedback network of four lines with four diffusers before it, at half rate. With both its sends at 0
 it switches itself off once its tail has died away. Projects saved by 0.2 load with the reverb off.
 
-XFX: THRU, CRUSH (bits, rate), BPF, RING (frequency, wobble), COMB (time, feedback), REPEAT (length; Y over the middle
-repeats), LPF, HPF, FOLD (drive, bias), GATE and PAN (rate, depth, tempo synced), FLANGE (rate, depth), and the glitch
-ones, synced to the bar while playing:
+XFX: THRU, CRUSH (BITS, S.RATE), BPF, LPF, HPF (CUTOFF, RES), RING (FREQ, WOBBLE), COMB (TIME, FDBK), REPEAT (LENGTH;
+REPEAT on over the middle), FOLD (DRIVE, BIAS), GATE, PAN, FLANGE (RATE, DEPTH; tempo synced), and the glitch ones,
+synced to the bar while playing (K2 and K3 show their names):
 
 | XFX | X | Y |
 |---|---|---|
-| CHOP | how much of each 16th sounds (4 % .. all) | the cut's shape: curved, straight, held |
-| SLICE | the slice: 1/32, 1/16, 1/8 | one of 16 patterns of slices that play the last one backwards |
-| FREEZE | under the first notch: listening; past it, loops the last 1/64 .. 1/4 | under the middle: slows to a stop; over: speeds up |
-| SPIN | a rotating speaker's speed: 1/16 .. 1 bar a turn | its depth (Doppler and level, L and R opposite) |
-| REFLEX | a resonant low pass's cutoff, L and R swept in mirror, a beat a cycle | resonance |
-| PITCH | the grain, 12 .. 92 ms | -12 .. +12 semitones |
+| CHOP | LENGTH: how much of each 16th sounds (4 % .. all) | SHAPE: the cut's, curved, straight, held |
+| SLICE | SIZE: 1/32, 1/16, 1/8 | PATTRN: one of 16 patterns of slices that play the last one backwards |
+| FREEZE | LOOP: OFF (listening), then the last 1/64 .. 1/4 | SPEED: under 0 slows to a stop; over: speeds up |
+| SPIN | SPEED: a rotating speaker, 1/16 .. 1 bar a turn | DEPTH (Doppler and level, L and R opposite) |
+| REFLEX | CUTOFF: a resonant low pass, L and R swept in mirror, a beat a cycle | RES |
+| PITCH | GRAIN: 12 .. 92 ms | PITCH: -12 .. +12 semitones |
 
 PULP is LIME.lite's Automatik Perc: a percussion oscillator struck by the drums that plays at the pitch it hears
 them at (between LO and HI), before the effects.
 
 TORSION is an animated distortion after boscomac's Bit Torsion (Reaktor): its behaviour, our own code. On TOR ANIM the
-white keys 1-12 pick which of BITS, RATE, DRIVE, CUTOFF, RES, NOT>BP, FDBK, FOLD, CLIP, SPREAD, GATE, LEVEL a random step
-sequence moves (orange on the inner ring); it repeats every LENGTH steps, and a SEED always gives the same one, so a
+white keys 1-12 pick which of BITS, S.RATE, DRIVE, CUTOFF, RES, NOT>BP, FDBK, FOLD, CLIP, SPREAD, N.GATE, LEVEL a random
+step sequence moves (their boxes turn orange); it repeats every LENGTH steps, and a SEED always gives the same one, so a
 project sounds the same when loaded again. Projects saved by 0.2 or 0.3 load with TORSION off.
 
 Only the chosen XFX runs; SLICE, FREEZE and PITCH use REPEAT's buffer, so they cost no memory.

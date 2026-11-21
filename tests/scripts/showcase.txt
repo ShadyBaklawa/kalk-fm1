@@ -1,6 +1,8 @@
 # a minute of KALK: A, B, C with a remix held, D, XFX gate and flanger, delay throws, back to A
 50 btn 2
 60 btn 2
+62 btn 2
+64 btn 2
 70 enc 5 15
 80 btn 11
 90 enc 4 6
@@ -14,7 +16,10 @@
 11700 keys 0x400000
 11800 keys 0
 13500 btn 2
-13510 enc 0 -1
+13502 btn 2
+13504 btn 2
+13506 btn 2
+13508 btn 2
 13600 enc 2 9
 13700 enc 3 -10
 13800 enc 4 40

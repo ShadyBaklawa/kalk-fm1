@@ -2,12 +2,15 @@
 # a sine; a higher range (199 Hz .. 1.2 kHz); square; a slow glide, panned left; off
 100 btn 12
 150 btn 2
-3900 enc 0 -1
-3910 enc 0 -1
-3920 enc 2 37
+3900 btn 2
+3902 btn 2
+3904 btn 2
+3906 btn 2
+3908 btn 2
+3920 enc 5 37
 4100 shot
-7800 enc 3 7
-7810 enc 4 5
+7800 enc 2 7
+7810 enc 3 5
 8000 shot
 11700 enc 0 1
 11710 enc 2 40
@@ -16,7 +19,7 @@
 15610 enc 5 -10
 15800 shot
 19500 enc 0 -1
-19510 enc 2 -37
+19510 enc 5 -37
 19700 shot
 21400 btn 12
 23000 end

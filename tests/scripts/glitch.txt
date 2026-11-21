@@ -2,7 +2,9 @@
 # at 1/32, POST FX (hard cuts), then PRE FX (the echoes ring through the cuts)
 100 btn 12
 150 btn 2
-160 enc 0 1
+160 btn 2
+162 btn 2
+164 btn 2
 170 enc 5 10
 200 btn 10
 210 enc 0 1

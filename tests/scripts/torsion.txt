@@ -2,11 +2,7 @@
 # GRIT GRID, SHRED, GHOST; then on TOR ANIM the white keys add DRIVE and FOLD to what moves, and a new SEED; off
 100 btn 12
 150 btn 2
-3900 enc 0 -1
-3910 enc 0 -1
-3920 enc 0 -1
-3930 enc 0 -1
-3940 enc 0 -1
+3900 btn 2
 3950 enc 2 1
 4100 shot
 7800 enc 2 1
@@ -31,7 +27,7 @@
 31200 enc 0 -1
 31210 enc 0 -1
 31220 enc 0 -1
-31230 enc 4 -50
+31230 enc 5 -50
 31400 shot
 33100 btn 12
 34600 end

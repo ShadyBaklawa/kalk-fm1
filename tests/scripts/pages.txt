@@ -1,5 +1,6 @@
-# the FX pages: FX cycles through all of them; REC records the XFX motion only on the XFX page.
-# REMIX > GATE: a white key cuts that step (the inner ring)
+# the FX pages: FX jumps through the 7 groups; REC records the XFX motion only on the XFX pages.
+# ARP x3: REMIX > GATE, a white key cuts that step (the inner ring). A lane key on an FX page stays there.
+# TOR ANIM: white key 4 (CUTOFF) lights its box
 100 btn 2
 200 shot
 300 btn 2
@@ -9,47 +10,37 @@
 500 btn 2
 550 btn 2
 600 btn 2
-650 btn 2
-700 btn 2
-750 btn 2
-800 btn 2
-850 btn 2
+800 shot
 900 btn 2
 950 btn 2
 1000 btn 2
 1050 btn 2
 1100 btn 2
 1150 btn 2
-1300 shot
-1400 btn 2
-1450 btn 2
-1500 btn 2
-1550 btn 2
-1600 btn 2
-1650 btn 2
-1850 shot
+1350 shot
+1450 btn 13
+1550 shot
+1650 btn 13
+1750 btn 2
 1950 btn 13
 2050 shot
 2150 btn 13
-2250 btn 2
-2300 btn 2
-2350 btn 2
-2400 btn 2
-2450 btn 2
-2500 btn 2
-2550 btn 2
-2600 btn 2
-2650 btn 2
-2700 btn 2
-2750 btn 2
-2800 btn 2
-3000 btn 13
-3100 shot
-3200 btn 13
-3500 btn 10
-3550 enc 0 1
-3600 enc 0 1
-3700 keys 0x10
-3750 keys 0
-3800 shot
-4000 end
+2450 btn 10
+2500 btn 10
+2550 btn 10
+2650 keys 0x10
+2700 keys 0
+2750 shot
+3050 btn 2
+4650 shot
+4750 keys 0x2
+4800 keys 0
+4950 shot
+5150 btn 2
+5200 enc 0 1
+5250 enc 0 1
+5300 enc 0 1
+5400 keys 0x40
+5450 keys 0
+5550 shot
+5750 end
