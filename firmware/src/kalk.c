@@ -10,7 +10,7 @@
  *   HOME / EDIT  the selected lane's sound    FX  effects    SEQ  sequence    ARP  remix    GLO  global
  *   SELECT the page   K1..K4 the four values   ALGORITHM the tempo   PRESETS the project slot
  *   SAVE   save to the slot (stopped)   SEL + SAVE   load it   ENV mute the lane   LFO solo the lane
- *          (an empty slot loads as the demo with that slot's own kit: CLASSIC, ACOUSTIC, FM, CRUSH, ...)
+ *          (an empty slot loads as the demo with that slot's own kit: CLASSIC, 909, DARK, RUMBLE, ...)
  *   SEL + HOME  a random kit (every voice's sound)   SEL + GLO  swap back to the kit before
  *   OCT- / OCT+  the previous / next lane
  *   on TIE, POD, MOD: hold a step and turn K1 for its value
@@ -101,16 +101,16 @@ static void proj_default(project_t *p)
 /* an empty slot starts as the demo with its own kit: WAV per voice (KICK SNARE HAT TIE POD). Slot 1's is the sound
  * KALK always had (VP_DEFAULT), so a first start sounds as before. 0..15 the synth's variants, 16..23 the samples. */
 #define NKIT 8u
-static const char *const KIT_NAME[NKIT] = {"CLASSIC", "ACOUSTIC", "FM", "CRUSH", "COMB", "PERC", "SYNTH 2", "MIXED"};
+static const char *const KIT_NAME[NKIT] = {"CLASSIC", "909", "DARK", "RUMBLE", "INDUSTR", "ACID", "GLITCH", "LO-FI"};
 static const uint8_t KIT_WAV[NKIT][NVOICE] = {
     {0, 1, 0, 2, 0},                            /* SYN 1, 2, 1, 3, 1 */
-    {20, 21, 21, 21, 21},                       /* BDRUM SNARE HIHAT COWBELL CLAVES */
-    {16, 16, 16, 16, 16},                       /* FMTHUD RINGSN FMHAT FMPING ZAPFM */
-    {18, 18, 19, 20, 20},                       /* CRSHKIK CRSHSN GRANHAT CRSHPNG BITBLIP */
-    {19, 19, 18, 17, 17},                       /* COMBKIK COMBSN COMBHAT RINGPNG COMBCLK */
-    {22, 22, 22, 23, 23},                       /* TUMBA RIMSHOT SHAKER CONGA TRIANGL */
-    {5, 9, 6, 10, 12},                          /* SYN 6, 10, 7, 11, 13 */
-    {23, 23, 23, 18, 18},                       /* LOG LO CLAP TAMB KARPLUS GLASS */
+    {16, 16, 16, 16, 21},                       /* K909 CLAP9 HAT909 STAB COWDRK */
+    {20, 17, 17, 19, 18},                       /* TAPEKIK DRKCLAP DRKHAT REESE CLICK */
+    {17, 18, 18, 21, 22},                       /* RUMBLE SN909 TICK SUBTONE RATCHT */
+    {22, 20, 19, 22, 23},                       /* INDKIK METLSN SIZZLE METALT SCRATCH */
+    {19, 21, 20, 18, 16},                       /* DISTKIK DISTSN RIDE ACIDPL LASER */
+    {23, 22, 21, 23, 17},                       /* GLTCHKK GLTCHSN GLTCHHT GLTCHTN GLTCH1 */
+    {21, 23, 22, 20, 20},                       /* BOXKIK STATIC BITHAT FMBELL2 DATA */
 };
 static void proj_new(project_t *p, uint32_t slot)   /* what an empty slot holds */
 {

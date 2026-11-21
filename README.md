@@ -5,7 +5,7 @@ drum and tone voices, each with 16 synthesised variants and 8 CC0 samples, a thr
 their own lengths, 127 remix variations, an XY effect with recorded motion, a tempo-synced delay and a maximiser.
 
 *Kalk* is lime, the stone. KALK is an independent work: no code, samples or artwork of
-Limelite are in it. The sounds are synthesised, or CC0 recordings from Versilian Studios' VCSL.
+Limelite are in it. Every sound is synthesised here (CC0).
 
 <p align="center"><img src="docs/screen.png" width="240" alt="KALK's screen: a lime slice of six rings, one a lane, the pattern in the middle, the four knobs along the bottom"></p>
 
@@ -69,16 +69,17 @@ unaccented hit is), MOD> and MOD (where the mod lane goes: WAV, PITCH, DECAY or 
 
 | | |
 | --- | --- |
-| KICK | FMTHUD, RINGKIK, CRSHKIK, COMBKIK, BDRUM, FRAME-M, TUMBA, LOG LO |
-| SNARE | RINGSN, GRANSN, CRSHSN, COMBSN, GLTCHCL, SNARE, RIMSHOT, CLAP |
-| HAT (closed / open) | FMHAT, TICKHAT, COMBHAT, GRANHAT, RINGHAT, HIHAT, SHAKER, TAMB |
-| TIE (pitched by its steps, glides) | FMPING, RINGPNG, KARPLUS, GRANBEL, CRSHPNG, COWBELL, WOOD, CONGA |
-| POD (ZAP bends them) | ZAPFM, COMBCLK, GLASS, GRANWOD, BITBLIP, CLAVES, BRAKE, TRIANGL |
+| KICK | K909, RUMBLE, DEEPKK, DISTKIK, TAPEKIK, BOXKIK, INDKIK, GLTCHKK |
+| SNARE | CLAP9, DRKCLAP, SN909, RIMSHT, METLSN, DISTSN, GLTCHSN, STATIC |
+| HAT (closed / open) | HAT909, DRKHAT, TICK, SIZZLE, RIDE, GLTCHHT, BITHAT, CRSHCYM |
+| TIE (tuned to A, pitched by its steps, glides) | STAB, DUBSTB, ACIDPL, REESE, FMBELL2, SUBTONE, METALT, GLTCHTN |
+| POD (ZAP bends them) | LASER, GLTCH1, CLICK, BLEEP, DATA, COWDRK, RATCHT, SCRATCH |
 
 A sample plays through the voice's filter, SAT, pitch and envelope: DECAY holds it for half its time, then releases
-(Limelite's hold and release); START skips into it. The first ones in each row are synthesised here by
-`tools/gen_vogel.py` (FM and ring-mod pings, bitcrushed ticks, comb clicks, granular smears); the rest are recordings
-from [VCSL](https://github.com/sgossner/VCSL) by Versilian Studios. All CC0 1.0: `assets/samples-cc0/ATTRIBUTION.txt`.
+(Limelite's hold and release); START skips into it. Since 0.7 the bank is dark / techno / glitch, all synthesised
+here by `tools/gen_vogel.py` (909-ish kicks, claps and hats, rumble, drive, metal combs, crush, stutters, chord stabs,
+acid, bleeps). CC0 1.0: `assets/samples-cc0/ATTRIBUTION.txt`. (Up to 0.6 it held some CC0 recordings from Versilian
+Studios' [VCSL](https://github.com/sgossner/VCSL); `tools/gen_vogel.py` still lists those older candidates.)
 `tools/gen_samples.py` rebuilds the banks (8-bit mu-law, in the app's flash); `python3 tools/gen_vogel.py` renders
 the synthesised candidates to `build/vogel/` to audition.
 
@@ -90,13 +91,13 @@ Turn PRESETS to a slot and press SEL + SAVE: the top line names the kit.
 | Slot | Kit | KICK | SNARE | HAT | TIE | POD |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | CLASSIC (KALK's first sound) | SYN 1 | SYN 2 | SYN 1 | SYN 3 | SYN 1 |
-| 2 | ACOUSTIC | BDRUM | SNARE | HIHAT | COWBELL | CLAVES |
-| 3 | FM | FMTHUD | RINGSN | FMHAT | FMPING | ZAPFM |
-| 4 | CRUSH | CRSHKIK | CRSHSN | GRANHAT | CRSHPNG | BITBLIP |
-| 5 | COMB | COMBKIK | COMBSN | COMBHAT | RINGPNG | COMBCLK |
-| 6 | PERC | TUMBA | RIMSHOT | SHAKER | CONGA | TRIANGL |
-| 7 | SYNTH 2 | SYN 6 | SYN 10 | SYN 7 | SYN 11 | SYN 13 |
-| 8 | MIXED | LOG LO | CLAP | TAMB | KARPLUS | GLASS |
+| 2 | 909 | K909 | CLAP9 | HAT909 | STAB | COWDRK |
+| 3 | DARK | TAPEKIK | DRKCLAP | DRKHAT | REESE | CLICK |
+| 4 | RUMBLE | RUMBLE | SN909 | TICK | SUBTONE | RATCHT |
+| 5 | INDUSTR | INDKIK | METLSN | SIZZLE | METALT | SCRATCH |
+| 6 | ACID | DISTKIK | DISTSN | RIDE | ACIDPL | LASER |
+| 7 | GLITCH | GLTCHKK | GLTCHSN | GLTCHHT | GLTCHTN | GLTCH1 |
+| 8 | LO-FI | BOXKIK | STATIC | BITHAT | FMBELL2 | DATA |
 
 **SEL + HOME** rolls a random kit, playing or not: every voice gets a new WAV (half the time a sample), TUNE, DECAY,
 filter and its own four knobs, within ranges that keep it a drum kit. The levels, patterns, MOD lane, effects and

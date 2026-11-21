@@ -2,56 +2,55 @@ KALK sample banks - source material
 Licence: CC0 1.0 Universal (public domain dedication)
   https://creativecommons.org/publicdomain/zero/1.0/
 Sources:
-  - tools/gen_vogel.py: synthesised in this repository (FM, ring-mod, crush, comb, Karplus-Strong),
-    some from grains of VCSL recordings; dedicated to the public domain under CC0 1.0.
-  - Versilian Studios (Sam Gossner), VCSL  https://github.com/sgossner/VCSL  (CC0-1.0)
+  - tools/gen_vogel.py: synthesised in this repository (FM, ring-mod, crush, comb, Karplus-Strong,
+    drive, stutter); dedicated to the public domain under CC0 1.0.
 Processed by tools/gen_samples.py: trimmed, normalised, faded, resampled, 8-bit mu-law.
 
-KICK  FMTHUD    380 ms  <-  tools/gen_vogel.py FMTHUD: 2-op FM, pitch drop 190->44 Hz, index decays in 12 ms
-KICK  RINGKIK   340 ms  <-  tools/gen_vogel.py RINGKIK: sine body ring-modded by a falling 400->87 Hz sine, noise click
-KICK  CRSHKIK   300 ms  <-  tools/gen_vogel.py CRSHKIK: folded sine kick, 5-bit, 1/6 sample-hold
-KICK  COMBKIK   330 ms  <-  tools/gen_vogel.py COMBKIK: dark noise burst into a 58 Hz comb, plus a sine body
-KICK  BDRUM     400 ms  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Bass Drum 1/BDrumNew_hit_v7_rr1_Sum.wav
-KICK  FRAME-M   397 ms  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Frame Drum/HDrumL_HitMuted_v3_rr1_Sum.wav
-KICK  TUMBA     400 ms  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Conga/Tumba_HitFM_v3_rr1_Sum.wav
-KICK  LOG LO    400 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Slit Drum/LogDrumLo_MedM_v3_rr1_Sum.wav
-SNARE RINGSN    235 ms  <-  tools/gen_vogel.py RINGSN: 184 x 333 Hz ring-mod tone with band-passed noise
-SNARE GRANSN    148 ms  <-  tools/gen_vogel.py GRANSN: granular smear of a VCSL snare (6-25 ms grains, half reversed)
-SNARE CRSHSN    150 ms  <-  tools/gen_vogel.py CRSHSN: noise + 330 Hz body, 4-bit, 1/9 sample-hold
-SNARE COMBSN     93 ms  <-  tools/gen_vogel.py COMBSN: noise burst through 2.3 ms and 4.1 ms combs: metallic
-SNARE GLTCHCL   246 ms  <-  tools/gen_vogel.py GLTCHCL: 4-burst clap ring-modded at 1130 Hz
-SNARE SNARE     320 ms  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Snare Drum, Modern 1/Snare2_HitSN_v9_rr1_Mid.wav
-SNARE RIMSHOT   320 ms  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Snare Drum, Modern 3/Snare4_rimshot_v4_rr1_Mid.wav
-SNARE CLAP       92 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Claps/SoloClap_vl4.wav
-HAT   FMHAT     132 ms  <-  tools/gen_vogel.py FMHAT: six inharmonic square partials, band-passed (closed / open)
-HAT   TICKHAT    25 ms  <-  tools/gen_vogel.py TICKHAT: 1-bit noise, 3-bit crush, high-passed ticks
-HAT   COMBHAT   114 ms  <-  tools/gen_vogel.py COMBHAT: noise through 0.31 / 0.47 ms combs
-HAT   GRANHAT   150 ms  <-  tools/gen_vogel.py GRANHAT: granular smears of VCSL hi-hat / suspended cymbal
-HAT   RINGHAT   104 ms  <-  tools/gen_vogel.py RINGHAT: 3.17 kHz x wobbling 4.73 kHz ring-mod plus noise
-HAT   HIHAT     150 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_HitC_v4_rr1_Mid.wav
-HAT   SHAKER    150 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Shaker, Small/Mid_ShakerDouble_Down_rr1.wav
-HAT   TAMB      150 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Tambourine 1/Tamb1_Hit_v2_rr1_Mid.wav
-HAT   FMHAT     355 ms  <-  tools/gen_vogel.py FMHAT: six inharmonic square partials, band-passed (closed / open)
-HAT   TICKHAT   125 ms  <-  tools/gen_vogel.py TICKHAT: 1-bit noise, 3-bit crush, high-passed ticks
-HAT   COMBHAT   397 ms  <-  tools/gen_vogel.py COMBHAT: noise through 0.31 / 0.47 ms combs
-HAT   GRANHAT   359 ms  <-  tools/gen_vogel.py GRANHAT: granular smears of VCSL hi-hat / suspended cymbal
-HAT   RINGHAT   362 ms  <-  tools/gen_vogel.py RINGHAT: 3.17 kHz x wobbling 4.73 kHz ring-mod plus noise
-HAT   HIHAT     400 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Hi-Hat Cymbal/HiHat_HitO_rr1_Mid.wav
-HAT   SHAKER    400 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Shaker, Small/Mid_Shaker_Roll_Fast_rr1.wav
-HAT   TAMB      400 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Tambourine 1/Tamb1_Shake_rr1_Mid.wav
-TIE   FMPING    300 ms  <-  tools/gen_vogel.py FMPING: FM bell, ratio 3.5, A4
-TIE   RINGPNG   279 ms  <-  tools/gen_vogel.py RINGPNG: 440 x 621 Hz ring-mod ping
-TIE   KARPLUS   279 ms  <-  tools/gen_vogel.py KARPLUS: Karplus-Strong pluck, A3
-TIE   GRANBEL   275 ms  <-  tools/gen_vogel.py GRANBEL: granular agogo bell, grains kept near pitch
-TIE   CRSHPNG   221 ms  <-  tools/gen_vogel.py CRSHPNG: FM ping (ratio 1.41), 4-bit, 1/4 sample-hold
-TIE   COWBELL   300 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Cowbells/Cowbell1_Normal_v3_rr1_Mid.wav
-TIE   WOOD      299 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Woodblock/wood_click_f_rr1.wav
-TIE   CONGA     300 ms  <-  sgossner/VCSL: Membranophones/Struck Membranophones/Conga/Conga_HitN_v3_rr1_Sum.wav
-POD   ZAPFM     220 ms  <-  tools/gen_vogel.py ZAPFM: FM zap, 2.4 kHz -> 180 Hz in 12 ms
-POD   COMBCLK    49 ms  <-  tools/gen_vogel.py COMBCLK: 3-sample click into a 1210 Hz comb
-POD   GLASS     167 ms  <-  tools/gen_vogel.py GLASS: C7 x F7 ring-mod plus C8: short glassy ping
-POD   GRANWOD   224 ms  <-  tools/gen_vogel.py GRANWOD: granular claves, scattered and re-pitched
-POD   BITBLIP    83 ms  <-  tools/gen_vogel.py BITBLIP: 3-bit square blip, octave drop after 20 ms
-POD   CLAVES    300 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Claves/Claves1_Hit_v2_rr1_Mid.wav
-POD   BRAKE     300 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Brake Drum/BrakeDrum1_Hammer_v3_rr1_Mid.wav
-POD   TRIANGL   300 ms  <-  sgossner/VCSL: Idiophones/Struck Idiophones/Triangles/Legacy/1/triangle1_hit_mp.wav
+KICK  K909      400 ms  <-  tools/gen_vogel.py K909: 909-ish: sine 280 -> 50 Hz, a click, a little drive
+KICK  RUMBLE    400 ms  <-  tools/gen_vogel.py RUMBLE: kick plus a low, smeared rumble tail (techno)
+KICK  DEEPKK    400 ms  <-  tools/gen_vogel.py DEEPKK: long 909, 400 Hz low pass: dark and round
+KICK  DISTKIK   360 ms  <-  tools/gen_vogel.py DISTKIK: 170 -> 44 Hz kick, driven hard, 3 kHz low pass
+KICK  TAPEKIK   380 ms  <-  tools/gen_vogel.py TAPEKIK: saturated, wobbling, 700 Hz low pass: muffled
+KICK  BOXKIK    220 ms  <-  tools/gen_vogel.py BOXKIK: short tight 68 Hz with a knock (minimal)
+KICK  INDKIK    400 ms  <-  tools/gen_vogel.py INDKIK: driven kick plus a 91 Hz metal comb (industrial)
+KICK  GLTCHKK   366 ms  <-  tools/gen_vogel.py GLTCHKK: the attack stuttered 3 times, then the kick
+SNARE CLAP9     300 ms  <-  tools/gen_vogel.py CLAP9: 909-ish clap: four bursts, 0.95-3.2 kHz
+SNARE DRKCLAP   320 ms  <-  tools/gen_vogel.py DRKCLAP: low dark clap 500-1600 Hz, longer tail
+SNARE SN909     260 ms  <-  tools/gen_vogel.py SN909: 909-ish snare: two tones + noise
+SNARE RIMSHT     44 ms  <-  tools/gen_vogel.py RIMSHT: synth rim: 1.7 kHz + 480 Hz, a click
+SNARE METLSN    111 ms  <-  tools/gen_vogel.py METLSN: noise through three combs: metallic, industrial
+SNARE DISTSN    260 ms  <-  tools/gen_vogel.py DISTSN: snare driven hard
+SNARE GLTCHSN   320 ms  <-  tools/gen_vogel.py GLTCHSN: crushed snare, attack stuttered
+SNARE STATIC    295 ms  <-  tools/gen_vogel.py STATIC: radio static burst with dropouts
+HAT   HAT909    121 ms  <-  tools/gen_vogel.py HAT909: metal partials + noise (closed / open)
+HAT   DRKHAT    125 ms  <-  tools/gen_vogel.py DRKHAT: darker metal, 4-9 kHz
+HAT   TICK       17 ms  <-  tools/gen_vogel.py TICK: tiny ticks
+HAT   SIZZLE    150 ms  <-  tools/gen_vogel.py SIZZLE: 4-bit noise sizzle
+HAT   RIDE      150 ms  <-  tools/gen_vogel.py RIDE: FM ride ping / ride
+HAT   GLTCHHT   145 ms  <-  tools/gen_vogel.py GLTCHHT: 909-ish hat, stuttered
+HAT   BITHAT     84 ms  <-  tools/gen_vogel.py BITHAT: 1-bit, 1/7 sample-hold
+HAT   CRSHCYM   150 ms  <-  tools/gen_vogel.py CRSHCYM: cymbal: noise + metal, long open
+HAT   HAT909    400 ms  <-  tools/gen_vogel.py HAT909: metal partials + noise (closed / open)
+HAT   DRKHAT    400 ms  <-  tools/gen_vogel.py DRKHAT: darker metal, 4-9 kHz
+HAT   TICK      161 ms  <-  tools/gen_vogel.py TICK: tiny ticks
+HAT   SIZZLE    400 ms  <-  tools/gen_vogel.py SIZZLE: 4-bit noise sizzle
+HAT   RIDE      400 ms  <-  tools/gen_vogel.py RIDE: FM ride ping / ride
+HAT   GLTCHHT   400 ms  <-  tools/gen_vogel.py GLTCHHT: 909-ish hat, stuttered
+HAT   BITHAT    400 ms  <-  tools/gen_vogel.py BITHAT: 1-bit, 1/7 sample-hold
+HAT   CRSHCYM   400 ms  <-  tools/gen_vogel.py CRSHCYM: cymbal: noise + metal, long open
+TIE   STAB      300 ms  <-  tools/gen_vogel.py STAB: A minor stab, resonant filter snap
+TIE   DUBSTB    298 ms  <-  tools/gen_vogel.py DUBSTB: Am7 dub-techno chord, 900 Hz, an echo
+TIE   ACIDPL    280 ms  <-  tools/gen_vogel.py ACIDPL: 303-ish: saw A2, resonant sweep, driven
+TIE   REESE     300 ms  <-  tools/gen_vogel.py REESE: detuned saws A2, dark
+TIE   FMBELL2   300 ms  <-  tools/gen_vogel.py FMBELL2: dark FM bell, ratio 1.4, A3
+TIE   SUBTONE   300 ms  <-  tools/gen_vogel.py SUBTONE: pitched sub hit A1
+TIE   METALT    300 ms  <-  tools/gen_vogel.py METALT: A3 x 2.76 ring: gong-ish
+TIE   GLTCHTN   300 ms  <-  tools/gen_vogel.py GLTCHTN: crushed FM tone, stuttered
+POD   LASER     180 ms  <-  tools/gen_vogel.py LASER: square zap 4 kHz -> 200 Hz
+POD   GLTCH1    234 ms  <-  tools/gen_vogel.py GLTCH1: random micro-chops of noise and tones
+POD   CLICK      22 ms  <-  tools/gen_vogel.py CLICK: a digital click
+POD   BLEEP     140 ms  <-  tools/gen_vogel.py BLEEP: two-note 1-bit bleep
+POD   DATA      200 ms  <-  tools/gen_vogel.py DATA: modem data burst
+POD   COWDRK    240 ms  <-  tools/gen_vogel.py COWDRK: dark 808-ish cowbell
+POD   RATCHT     92 ms  <-  tools/gen_vogel.py RATCHT: four fast clicks
+POD   SCRATCH   220 ms  <-  tools/gen_vogel.py SCRATCH: scratch-ish wobbling filter noise

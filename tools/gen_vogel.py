@@ -318,6 +318,619 @@ def pod_bitblip(rng):
     return crush(np.sign(osc(f, d)) * expenv(d, 0.04), 3, 2) * 0.6
 
 
+# ---------------------------------------------------------------- the dark / techno / glitch set (0.7 candidates)
+def sat(x, drive):
+    return np.tanh(x * drive) / np.tanh(drive)
+
+
+def saw(freq, dur, phase=0.0):
+    f = np.broadcast_to(np.asarray(freq, float), (int(FS * dur),))
+    p = (np.cumsum(f) / FS + phase) % 1.0
+    return 2 * p - 1
+
+
+def sq(freq, dur, phase=0.0):
+    return np.sign(osc(freq, dur, phase))
+
+
+def rlp(x, fc, q):
+    """resonant 2-pole low pass (Chamberlin SVF), fc may be an array"""
+    fc = np.broadcast_to(np.asarray(fc, float), x.shape)
+    lo = bd = 0.0
+    y = np.zeros(len(x))
+    damp = 1.0 / q
+    for n in range(len(x)):
+        f = 2 * np.sin(np.pi * min(fc[n], FS / 6) / FS)
+        lo += f * bd
+        hi = x[n] - lo - damp * bd
+        bd += f * hi
+        y[n] = lo
+    return y
+
+
+def stutter(x, piece, times, gap=0.0):
+    """the first `piece` s repeated `times` times (with a gap), then the whole sound"""
+    p = x[: int(piece * FS)] * np.hanning(int(piece * FS) * 2)[int(piece * FS):] ** 0.2
+    g = np.zeros(int(gap * FS))
+    return np.concatenate([np.concatenate([p, g]) for _ in range(times)] + [x])
+
+
+def tail(x, d):
+    """a dark rumble: the sound smeared by a short noise 'room', low-passed"""
+    rng = np.random.default_rng(7)
+    ir = rng.uniform(-1, 1, int(FS * d)) * np.exp(-t_(d) / (d / 4))
+    y = np.convolve(x, ir)[: len(x)] * 0.02
+    return lp(y, 220, 2)
+
+
+def k909(d=0.40, f0=280, f1=50, tau=0.028, dec=0.14):
+    return osc(sweep(f0, f1, tau, d), d) * expenv(d, dec)
+
+
+def dk_k909(rng):
+    d = 0.40
+    click = hp(noise(d, rng), 3000) * expenv(d, 0.0015)
+    return sat(k909(d) + 0.25 * click, 1.6)
+
+
+def dk_rumble(rng):
+    d = 0.40
+    k = k909(d, 220, 46, 0.03, 0.09)
+    r = tail(k, 0.35)
+    return sat(k * 0.8 + 3.0 * r / (np.abs(r).max() + 1e-9) * 0.6 * expenv(d, 0.2, att=0.03), 1.8)
+
+
+def dk_distkik(rng):
+    d = 0.36
+    return lp(sat(k909(d, 170, 44, 0.03, 0.12), 7), 3000)
+
+
+def dk_hardkik(rng):
+    d = 0.38
+    x = k909(d, 420, 55, 0.018, 0.16)
+    return lp(sat(fold(x * 1.2, 1.6), 3), 5000)
+
+
+def dk_subkik(rng):
+    d = 0.40
+    return osc(sweep(90, 42, 0.05, d), d) * expenv(d, 0.2, att=0.002)
+
+
+def dk_dustkik(rng):
+    d = 0.34
+    x = crush(k909(d, 240, 48), 6, 4) + 0.04 * crush(noise(d, rng), 2, 30) * expenv(d, 0.1)
+    return lp(x, 4500)
+
+
+def dk_tapekik(rng):
+    d = 0.38
+    wob = 1 + 0.03 * osc(7, d)
+    return lp(sat(osc(sweep(200, 47, 0.035, d) * wob, d) * expenv(d, 0.13), 3), 700)
+
+
+def dk_boxkik(rng):
+    d = 0.22
+    knock = bp(noise(d, rng), 900, 1600) * expenv(d, 0.006)
+    return k909(d, 200, 68, 0.012, 0.05) + 0.5 * knock
+
+
+def dk_fmdark(rng):
+    d = 0.38
+    f = sweep(150, 40, 0.04, d)
+    return fm(f, 0.5, 3.5 * np.exp(-t_(d) / 0.03), d) * expenv(d, 0.11)
+
+
+def dk_gltchkk(rng):
+    x = sat(k909(0.30, 300, 52, 0.02, 0.11), 2)
+    return stutter(x, 0.022, 3)[: int(FS * 0.40)]
+
+
+def dk_bitkik(rng):
+    d = 0.34
+    return crush(sat(k909(d, 260, 50, 0.025, 0.12), 2), 3, 10)
+
+
+def dk_indkik(rng):
+    d = 0.40
+    k = sat(k909(d, 230, 50, 0.025, 0.13), 3)
+    m = comb(bp(noise(d, rng), 400, 3000) * expenv(d, 0.01), 1 / 91.0, 0.9, 0.3)
+    return k + 0.35 * m / (np.abs(m).max() + 1e-9) * expenv(d, 0.12, att=0)
+
+
+def dk_acidkk(rng):
+    d = 0.36
+    x = saw(sweep(110, 41, 0.05, d), d) * expenv(d, 0.12)
+    return sat(rlp(x, 120 + 2600 * np.exp(-t_(d) / 0.025), 6), 2) + 0.5 * k909(d, 160, 41, 0.03, 0.12)
+
+
+def dk_deepkk(rng):
+    d = 0.40
+    return lp(sat(k909(d, 180, 44, 0.04, 0.18), 1.4), 400)
+
+
+def dk_clipkik(rng):
+    d = 0.26
+    return lp(sat(osc(sweep(120, 52, 0.02, d), d) * expenv(d, 0.07), 14), 2500)
+
+
+def dk_zapkik(rng):
+    d = 0.36
+    return sat(osc(sweep(2400, 48, 0.006, d), d) * expenv(d, 0.12), 1.5)
+
+
+def clap(d, rng, lo=900, hi=3000, tl=0.06, bursts=(0.0, 0.010, 0.019, 0.030)):
+    x = np.zeros(int(FS * d))
+    for k, off in enumerate(bursts):
+        o = int(off * FS)
+        last = k == len(bursts) - 1
+        seg = bp(noise(d - off, rng), lo, hi) * expenv(d - off, tl if last else 0.004)
+        x[o:o + len(seg)] += seg[: len(x) - o]
+    return x
+
+
+def dk_clap9(rng):
+    return clap(0.30, rng, 950, 3200, 0.07)
+
+
+def dk_drkclap(rng):
+    return lp(clap(0.32, rng, 500, 1600, 0.10, (0.0, 0.013, 0.024, 0.038)), 2500)
+
+
+def dk_sn909(rng):
+    d = 0.26
+    tone = osc(sweep(250, 180, 0.02, d), d) * expenv(d, 0.04) + 0.6 * osc(330, d) * expenv(d, 0.03)
+    return 0.7 * tone + 0.9 * hp(noise(d, rng), 1500) * expenv(d, 0.07)
+
+
+def dk_noisesn(rng):
+    d = 0.20
+    return crush(hp(noise(d, rng), 1800) * expenv(d, 0.04), 6, 2)
+
+
+def dk_rimsht(rng):
+    d = 0.10
+    return (osc(1700, d) + 0.8 * osc(480, d)) * expenv(d, 0.008) + 0.5 * hp(noise(d, rng), 4000) * expenv(d, 0.002)
+
+
+def dk_metlsn(rng):
+    d = 0.32
+    exc = bp(noise(d, rng), 500, 8000) * expenv(d, 0.008)
+    x = comb(exc, 0.00193, 0.9, 0.15) + comb(exc, 0.00311, 0.88, 0.15) + comb(exc, 0.00457, 0.86, 0.2)
+    return hp(x, 250) * expenv(d, 0.1, att=0) + 0.3 * k909(d, 300, 190, 0.01, 0.03)
+
+
+def dk_distsn(rng):
+    d = 0.26
+    x = osc(sweep(260, 170, 0.02, d), d) * expenv(d, 0.05) + hp(noise(d, rng), 800) * expenv(d, 0.08)
+    return lp(sat(x, 9), 7000)
+
+
+def dk_gatesn(rng):
+    d = 0.24
+    x = dk_sn909(rng)[: int(FS * d)] + 0.5 * tail(hp(noise(d, rng), 600), 0.2) * 40
+    g = np.where(t_(d) < 0.17, 1.0, 0.0)
+    return lp(x, 6000) * g
+
+
+def dk_gltchsn(rng):
+    x = crush(dk_sn909(rng), 5, 3)
+    return stutter(x, 0.018, 3, 0.006)[: int(FS * 0.32)]
+
+
+def dk_bitsn(rng):
+    d = 0.20
+    return crush(noise(d, rng) * expenv(d, 0.05) + 0.6 * sq(200, d) * expenv(d, 0.03), 2, 5)
+
+
+def dk_snap(rng):
+    d = 0.12
+    return bp(noise(d, rng), 1800, 4500) * expenv(d, 0.012) + 0.6 * osc(2600, d) * expenv(d, 0.003)
+
+
+def dk_revsn(rng):
+    d = 0.16
+    x = hp(noise(d, rng), 1200) * (t_(d) / d) ** 3
+    x[-int(FS * 0.004):] *= np.linspace(1, 0, int(FS * 0.004))
+    return x
+
+
+def dk_tomsn(rng):
+    d = 0.30
+    return osc(sweep(180, 115, 0.04, d), d) * expenv(d, 0.09) + 0.5 * bp(noise(d, rng), 300, 2500) * expenv(d, 0.05)
+
+
+def dk_fmsnr(rng):
+    d = 0.24
+    return fm(sweep(330, 200, 0.02, d), 2.71, 9 * np.exp(-t_(d) / 0.05), d) * expenv(d, 0.06)
+
+
+def dk_static(rng):
+    d = 0.30
+    x = crush(noise(d, rng), 3, 6)
+    gate = np.repeat(rng.random(int(d * 200) + 1) > 0.45, int(FS / 200))[: int(FS * d)]
+    return bp(x * gate, 1500, 9000) * expenv(d, 0.12)
+
+
+def dk_shotsn(rng):
+    d = 0.18
+    return sat(hp(noise(d, rng), 2500) * expenv(d, 0.02, att=0), 6) * expenv(d, 0.05, att=0)
+
+
+def hats(fn, rng, closed=0.15, opn=0.40, tc=0.022, to=0.11):
+    m = fn(opn, rng)
+    return m[: int(closed * FS)] * expenv(closed, tc), m * expenv(opn, to)
+
+
+def dk_hat909(rng):
+    return hats(lambda d, r: 0.6 * _metal(d, 345, r) + 0.6 * hp(noise(d, r), 8000), rng)
+
+
+def dk_drkhat(rng):
+    return hats(lambda d, r: lp(bp(_metal(d, 280, r), 4000, 9000) + 0.3 * bp(noise(d, r), 4000, 8000), 7500), rng)
+
+
+def dk_noishat(rng):
+    return hats(lambda d, r: hp(noise(d, r), 7000, 4), rng, tc=0.018, to=0.09)
+
+
+def dk_tick(rng):
+    return hats(lambda d, r: hp(noise(d, r), 5000), rng, tc=0.003, to=0.03)
+
+
+def dk_sizzle(rng):
+    return hats(lambda d, r: hp(crush(noise(d, r), 4, 3), 5000), rng, tc=0.03, to=0.15)
+
+
+def dk_ride(rng):
+    def r_(d, r):
+        return hp(fm(1250, 2.414, 3.0, d) + 0.5 * _metal(d, 460, r), 3000)
+    return hats(r_, rng, tc=0.05, to=0.25)
+
+
+def dk_shkhat(rng):
+    def s_(d, r):
+        x = bp(noise(d, r), 5000, 12000)
+        return x * (expenv(d, 0.02) + 0.8 * np.roll(expenv(d, 0.02), int(0.03 * FS)))
+    return hats(s_, rng, tc=0.06, to=0.16)
+
+
+def dk_gltchht(rng):
+    c, o = dk_hat909(rng)
+    return stutter(c, 0.008, 3)[: int(FS * 0.15)], stutter(o, 0.012, 4, 0.004)[: int(FS * 0.40)]
+
+
+def dk_bithat(rng):
+    return hats(lambda d, r: hp(crush(np.sign(noise(d, r)), 1, 7), 3000), rng, tc=0.015, to=0.08)
+
+
+def dk_chnhat(rng):
+    def c_(d, r):
+        x = np.zeros(int(FS * d))
+        for k in range(9):
+            o = int(r.uniform(0, 0.12) * FS)
+            s = _metal(0.03, r.uniform(300, 500), r) * expenv(0.03, 0.006)
+            x[o:o + len(s)] += s[: len(x) - o] * r.uniform(0.3, 1)
+        return x
+    return hats(c_, rng, tc=0.04, to=0.12)
+
+
+def dk_dustht(rng):
+    def d_(d, r):
+        x = np.where(r.random(int(FS * d)) > 0.995, r.uniform(-1, 1, int(FS * d)), 0.0)
+        return hp(x + 0.15 * noise(d, r), 4000)
+    return hats(d_, rng, tc=0.04, to=0.14)
+
+
+def dk_fmhat2(rng):
+    return hats(lambda d, r: hp(fm(8300, 1.41, 6.0, d), 5000) + 0.3 * hp(noise(d, r), 9000), rng)
+
+
+def dk_ringht2(rng):
+    return hats(lambda d, r: hp(ring(osc(5200, d), osc(7900, d)) + 0.4 * noise(d, r), 4500), rng)
+
+
+def dk_airhat(rng):
+    def a_(d, r):
+        return hp(noise(d, r), 6000) * np.minimum(1, t_(d) / 0.012)
+    return hats(a_, rng, tc=0.04, to=0.2)
+
+
+def dk_crshcym(rng):
+    def c_(d, r):
+        return hp(0.7 * noise(d, r) + 0.6 * _metal(d, 390, r), 3500)
+    return hats(c_, rng, tc=0.05, to=0.6)
+
+
+def dk_tinhat(rng):
+    return hats(lambda d, r: hp(comb(noise(d, r), 0.00021, 0.8, 0.1), 3000), rng)
+
+
+A2, A3, A4 = 110.0, 220.0, 440.0
+
+
+def chord(fs, d, fn=saw, det=0.0):
+    return sum(fn(f * (1 + det * k), d) for k in (-1, 1) for f in fs) / len(fs)
+
+
+def dk_stab(rng):
+    d = 0.30
+    x = chord([A3, A3 * 1.1892, A3 * 1.4983], d, det=0.004)
+    return rlp(x, 300 + 4000 * np.exp(-t_(d) / 0.04), 2.5) * expenv(d, 0.09)
+
+
+def dk_dubstb(rng):
+    d = 0.30
+    x = chord([A3, A3 * 1.1892, A3 * 1.4983, A3 * 1.7818], d, det=0.003)
+    y = lp(x, 900) * expenv(d, 0.06)
+    return y + 0.5 * np.roll(y, int(0.075 * FS)) * (t_(d) > 0.075)
+
+
+def dk_acidpl(rng):
+    d = 0.28
+    return sat(rlp(saw(A2, d), 150 + 3500 * np.exp(-t_(d) / 0.05), 8) * expenv(d, 0.1), 2.5)
+
+
+def dk_reese(rng):
+    d = 0.30
+    return lp(chord([A2], d, det=0.012) + 0.6 * osc(A2 / 2, d), 600) * expenv(d, 0.12, att=0.004)
+
+
+def dk_fmbell2(rng):
+    d = 0.30
+    return fm(A3, 1.4, 5 * np.exp(-t_(d) / 0.06), d) * expenv(d, 0.09)
+
+
+def dk_blip(rng):
+    d = 0.10
+    return lp(sq(A4 * 2, d), 5000) * expenv(d, 0.02) * 0.6
+
+
+def dk_pluckd(rng):
+    return lp(karplus(A2, 0.30, rng, decay=0.992, bright=0.2), 1500) * expenv(0.30, 0.1, att=0)
+
+
+def dk_organ(rng):
+    d = 0.24
+    x = sq(A3, d) + 0.5 * sq(A3 * 2, d) + 0.7 * osc(A3 / 2, d)
+    return lp(x, 2200) * expenv(d, 0.07, att=0.002) * 0.6
+
+
+def dk_metalt(rng):
+    d = 0.30
+    return ring(osc(A3, d), osc(A3 * 2.76, d)) * expenv(d, 0.08) + 0.4 * osc(A3, d) * expenv(d, 0.1)
+
+
+def dk_subtone(rng):
+    d = 0.30
+    return osc(A2 / 2 * (1 + 0.5 * np.exp(-t_(d) / 0.008)), d) * expenv(d, 0.15) + 0.2 * hp(noise(d, rng), 3000) * expenv(d, 0.002)
+
+
+def dk_hoover(rng):
+    d = 0.30
+    f = A3 * (1 - 0.06 * np.exp(-t_(d) / 0.05))
+    return lp(chord([f, f * 0.5], d, det=0.01), 2500) * expenv(d, 0.12, att=0.005)
+
+
+def dk_gltchtn(rng):
+    d = 0.28
+    x = crush(fm(A3, 2.0, 2.0, d) * expenv(d, 0.09), 4, 3)
+    return stutter(x, 0.025, 2, 0.01)[: int(FS * 0.30)]
+
+
+def dk_chordm(rng):
+    d = 0.30
+    fs = [A3, A3 * 1.1892, A3 * 1.4983, A3 * 2.2449]
+    return sum(fm(f, 1.0, 1.5 * np.exp(-t_(d) / 0.05), d) for f in fs) / 4 * expenv(d, 0.09)
+
+
+def dk_noisetn(rng):
+    d = 0.30
+    x = comb(lp(noise(d, rng), 2500) * expenv(d, 0.01), 1 / A3, 0.97, 0.5)
+    return lp(hp(x, 100), 3000) * expenv(d, 0.12, att=0)
+
+
+def dk_formnt(rng):
+    d = 0.28
+    s = saw(A2, d)
+    return (bp(s, 350, 550) + 0.6 * bp(s, 750, 1000)) * expenv(d, 0.1, att=0.003)
+
+
+def dk_sinepng(rng):
+    d = 0.24
+    return osc(A4, d) * expenv(d, 0.05)
+
+
+def dk_laser(rng):
+    d = 0.18
+    return sq(sweep(4000, 200, 0.03, d), d) * expenv(d, 0.05) * 0.5
+
+
+def dk_gltch1(rng):
+    d = 0.24
+    x = np.zeros(int(FS * d))
+    o = 0
+    while o < len(x) - 200:
+        n = int(rng.uniform(0.004, 0.02) * FS)
+        k = rng.integers(3)
+        s = (noise(n / FS, rng) if k == 0 else sq(rng.uniform(200, 4000), n / FS) if k == 1 else osc(rng.uniform(100, 3000), n / FS))
+        e = min(len(x), o + len(s))
+        x[o:e] = s[: e - o] * (rng.random() > 0.3)
+        o += n
+    return crush(x, 4, 2) * expenv(d, 0.08, att=0)
+
+
+def dk_click(rng):
+    d = 0.04
+    x = np.zeros(int(FS * d))
+    x[:4] = [1, -1, 0.6, -0.3]
+    return hp(x, 1000) * 0.5 + osc(3100, d) * expenv(d, 0.004) + 0.4 * osc(6900, d) * expenv(d, 0.002)
+
+
+def dk_bleep(rng):
+    d = 0.14
+    f = np.where(t_(d) < 0.05, 2000, 1500)
+    return sq(f, d) * expenv(d, 0.05) * 0.5
+
+
+def dk_data(rng):
+    d = 0.20
+    f = np.repeat(rng.choice([600, 1200, 1800, 2400, 3600], int(d * 250) + 1), int(FS / 250))[: int(FS * d)]
+    return sq(f, d) * expenv(d, 0.09) * 0.5
+
+
+def dk_static2(rng):
+    d = 0.20
+    x = np.where(rng.random(int(FS * d)) > 0.985, rng.uniform(-1, 1, int(FS * d)), 0.0)
+    return bp(x, 1000, 10000) * expenv(d, 0.08, att=0)
+
+
+def dk_drop(rng):
+    d = 0.16
+    return sq(sweep(800, 100, 0.03, d), d) * expenv(d, 0.06) * 0.5
+
+
+def dk_rise(rng):
+    d = 0.12
+    return sq(200 * np.exp(t_(d) / 0.04), d) * np.minimum(1, t_(d) / 0.08) * (t_(d) < 0.115) * 0.5
+
+
+def dk_tink(rng):
+    d = 0.12
+    return fm(3520, 3.01, 2.5 * np.exp(-t_(d) / 0.01), d) * expenv(d, 0.02)
+
+
+def dk_buzz(rng):
+    d = 0.10
+    return crush(sq(100, d) + 0.5 * sq(151, d), 3, 4) * expenv(d, 0.05, att=0) * 0.5
+
+
+def dk_scratch(rng):
+    d = 0.22
+    n = noise(d, rng)
+    c = 1000 + 2500 * (0.5 + 0.5 * osc(9, d))
+    return rlp(n, c, 4) * expenv(d, 0.1, att=0.01)
+
+
+def dk_bonk(rng):
+    d = 0.14
+    return osc(sweep(900, 560, 0.01, d), d) * expenv(d, 0.025) + 0.3 * bp(noise(d, rng), 600, 2000) * expenv(d, 0.003)
+
+
+def dk_spring(rng):
+    d = 0.30
+    exc = lp(noise(d, rng), 3000) * expenv(d, 0.003)
+    y = np.zeros(len(exc))
+    for n in range(len(exc)):
+        dl = int(FS * (0.007 + 0.003 * np.sin(2 * np.pi * 6 * n / FS)))
+        y[n] = exc[n] + (0.9 * y[n - dl] if n >= dl else 0)
+    return lp(hp(y, 150), 4000) * expenv(d, 0.1, att=0)
+
+
+def dk_ratcht(rng):
+    d = 0.16
+    x = np.zeros(int(FS * d))
+    for k in range(4):
+        o = int(k * 0.028 * FS)
+        s = hp(noise(0.01, rng), 2000) * expenv(0.01, 0.0015)
+        x[o:o + len(s)] += s * (1 - 0.18 * k)
+    return x
+
+
+def dk_crack(rng):
+    d = 0.10
+    return sat(hp(noise(d, rng), 3000) * expenv(d, 0.006, att=0), 8)
+
+
+def dk_cowdrk(rng):
+    d = 0.24
+    x = sq(400, d) + sq(595, d)
+    return lp(bp(x, 500, 2000), 1800) * (0.6 * expenv(d, 0.01) + 0.4 * expenv(d, 0.07)) * 0.5
+
+
+DARK = [
+    ("KICK", "K909", dk_k909, "909-ish: sine 280 -> 50 Hz, a click, a little drive"),
+    ("KICK", "RUMBLE", dk_rumble, "kick plus a low, smeared rumble tail (techno)"),
+    ("KICK", "DISTKIK", dk_distkik, "170 -> 44 Hz kick, driven hard, 3 kHz low pass"),
+    ("KICK", "HARDKIK", dk_hardkik, "fast 420 Hz attack, folded and driven"),
+    ("KICK", "SUBKIK", dk_subkik, "deep 90 -> 42 Hz sub, round"),
+    ("KICK", "DUSTKIK", dk_dustkik, "lo-fi: 6-bit, 1/4 sample-hold, dust"),
+    ("KICK", "TAPEKIK", dk_tapekik, "saturated, wobbling, 700 Hz low pass: muffled"),
+    ("KICK", "BOXKIK", dk_boxkik, "short tight 68 Hz with a knock (minimal)"),
+    ("KICK", "FMDARK", dk_fmdark, "FM ratio 0.5 thud, 150 -> 40 Hz"),
+    ("KICK", "GLTCHKK", dk_gltchkk, "the attack stuttered 3 times, then the kick"),
+    ("KICK", "BITKIK", dk_bitkik, "3-bit, 1/10 sample-hold: aliasing kick"),
+    ("KICK", "INDKIK", dk_indkik, "driven kick plus a 91 Hz metal comb (industrial)"),
+    ("KICK", "ACIDKK", dk_acidkk, "saw through a resonant sweep plus a sine body"),
+    ("KICK", "DEEPKK", dk_deepkk, "long 909, 400 Hz low pass: dark and round"),
+    ("KICK", "CLIPKIK", dk_clipkik, "clipped to a square-ish sub, short"),
+    ("KICK", "ZAPKIK", dk_zapkik, "psy zap: 2.4 kHz -> 48 Hz in 6 ms"),
+    ("SNARE", "CLAP9", dk_clap9, "909-ish clap: four bursts, 0.95-3.2 kHz"),
+    ("SNARE", "DRKCLAP", dk_drkclap, "low dark clap 500-1600 Hz, longer tail"),
+    ("SNARE", "SN909", dk_sn909, "909-ish snare: two tones + noise"),
+    ("SNARE", "NOISESN", dk_noisesn, "tight high-passed noise, 6-bit"),
+    ("SNARE", "RIMSHT", dk_rimsht, "synth rim: 1.7 kHz + 480 Hz, a click"),
+    ("SNARE", "METLSN", dk_metlsn, "noise through three combs: metallic, industrial"),
+    ("SNARE", "DISTSN", dk_distsn, "snare driven hard"),
+    ("SNARE", "GATESN", dk_gatesn, "gated tail, cut at 170 ms"),
+    ("SNARE", "GLTCHSN", dk_gltchsn, "crushed snare, attack stuttered"),
+    ("SNARE", "BITSN", dk_bitsn, "2-bit noise and square"),
+    ("SNARE", "SNAP", dk_snap, "short snap / click"),
+    ("SNARE", "REVSN", dk_revsn, "reverse swell, cut (sucks into the beat)"),
+    ("SNARE", "TOMSN", dk_tomsn, "dark low tom-snare, 180 -> 115 Hz"),
+    ("SNARE", "FMSNR", dk_fmsnr, "FM noise snare, high index"),
+    ("SNARE", "STATIC", dk_static, "radio static burst with dropouts"),
+    ("SNARE", "SHOTSN", dk_shotsn, "hard crack, driven noise"),
+    ("HAT", "HAT909", dk_hat909, "metal partials + noise (closed / open)"),
+    ("HAT", "DRKHAT", dk_drkhat, "darker metal, 4-9 kHz"),
+    ("HAT", "NOISHAT", dk_noishat, "plain high noise"),
+    ("HAT", "TICK", dk_tick, "tiny ticks"),
+    ("HAT", "SIZZLE", dk_sizzle, "4-bit noise sizzle"),
+    ("HAT", "RIDE", dk_ride, "FM ride ping / ride"),
+    ("HAT", "SHKHAT", dk_shkhat, "shaker-ish double hit"),
+    ("HAT", "GLTCHHT", dk_gltchht, "909-ish hat, stuttered"),
+    ("HAT", "BITHAT", dk_bithat, "1-bit, 1/7 sample-hold"),
+    ("HAT", "CHNHAT", dk_chnhat, "a scatter of tiny metal hits (chains)"),
+    ("HAT", "DUSTHT", dk_dustht, "vinyl crackle"),
+    ("HAT", "FMHAT2", dk_fmhat2, "FM 8.3 kHz, ratio 1.41"),
+    ("HAT", "RINGHT2", dk_ringht2, "5.2 x 7.9 kHz ring-mod"),
+    ("HAT", "AIRHAT", dk_airhat, "breathy, soft attack"),
+    ("HAT", "CRSHCYM", dk_crshcym, "cymbal: noise + metal, long open"),
+    ("HAT", "TINHAT", dk_tinhat, "noise through a 0.21 ms comb: tinny"),
+    ("TIE", "STAB", dk_stab, "A minor stab, resonant filter snap"),
+    ("TIE", "DUBSTB", dk_dubstb, "Am7 dub-techno chord, 900 Hz, an echo"),
+    ("TIE", "ACIDPL", dk_acidpl, "303-ish: saw A2, resonant sweep, driven"),
+    ("TIE", "REESE", dk_reese, "detuned saws A2, dark"),
+    ("TIE", "FMBELL2", dk_fmbell2, "dark FM bell, ratio 1.4, A3"),
+    ("TIE", "BLIP", dk_blip, "square blip A5"),
+    ("TIE", "PLUCKD", dk_pluckd, "dark pluck A2"),
+    ("TIE", "ORGAN", dk_organ, "short organ, A3 + sub"),
+    ("TIE", "METALT", dk_metalt, "A3 x 2.76 ring: gong-ish"),
+    ("TIE", "SUBTONE", dk_subtone, "pitched sub hit A1"),
+    ("TIE", "HOOVER", dk_hoover, "detuned saws with a dip (rave)"),
+    ("TIE", "GLTCHTN", dk_gltchtn, "crushed FM tone, stuttered"),
+    ("TIE", "CHORDM", dk_chordm, "A minor 9, soft FM"),
+    ("TIE", "NOISETN", dk_noisetn, "noise tuned to A3 by a comb"),
+    ("TIE", "FORMNT", dk_formnt, "vowel-ish 'o', saw A2"),
+    ("TIE", "SINEPNG", dk_sinepng, "pure sine ping A4"),
+    ("POD", "LASER", dk_laser, "square zap 4 kHz -> 200 Hz"),
+    ("POD", "GLTCH1", dk_gltch1, "random micro-chops of noise and tones"),
+    ("POD", "CLICK", dk_click, "a digital click"),
+    ("POD", "BLEEP", dk_bleep, "two-note 1-bit bleep"),
+    ("POD", "DATA", dk_data, "modem data burst"),
+    ("POD", "STATIC2", dk_static2, "crackle burst"),
+    ("POD", "DROP", dk_drop, "square 800 -> 100 Hz drop"),
+    ("POD", "RISE", dk_rise, "square 200 Hz rising fast"),
+    ("POD", "TINK", dk_tink, "high FM tink"),
+    ("POD", "BUZZ", dk_buzz, "crushed 100 Hz buzz"),
+    ("POD", "SCRATCH", dk_scratch, "scratch-ish wobbling filter noise"),
+    ("POD", "BONK", dk_bonk, "synth wood block"),
+    ("POD", "SPRING", dk_spring, "spring boing (wobbling comb)"),
+    ("POD", "RATCHT", dk_ratcht, "four fast clicks"),
+    ("POD", "CRACK", dk_crack, "driven noise crack"),
+    ("POD", "COWDRK", dk_cowdrk, "dark 808-ish cowbell"),
+]
+
+
 CANDIDATES = [
     ("KICK", "FMTHUD", kick_fmthud, "2-op FM, pitch drop 190->44 Hz, index decays in 12 ms"),
     ("KICK", "RINGKIK", kick_ringkik, "sine body ring-modded by a falling 400->87 Hz sine, noise click"),
@@ -344,6 +957,7 @@ CANDIDATES = [
     ("POD", "GRANWOD", pod_granwod, "granular claves, scattered and re-pitched"),
     ("POD", "BITBLIP", pod_bitblip, "3-bit square blip, octave drop after 20 ms"),
 ]
+CANDIDATES += DARK      # appended: the first 24 keep their numbers (and seeds)
 
 
 # ---------------------------------------------------------------- to the FM-1's format and back

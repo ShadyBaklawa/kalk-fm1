@@ -7,7 +7,7 @@ firmware/src/kalk_samples.h (in the app's flash: no RAM), with assets/samples-cc
 
   python3 tools/gen_samples.py [CACHE_DIR]      (downloads go to CACHE_DIR, default /tmp/kalk-vcsl)
 
-Eight samples per voice: WAV 17..24 (the gen_vogel ones first). A path "vogel:NAME" is a gen_vogel candidate. The hat has pairs: the closed step plays the first, the open step the second.
+Eight samples per voice: WAV 17..24, since 0.7 all rendered by tools/gen_vogel.py (dark / techno / glitch). A path "vogel:NAME" is a gen_vogel candidate. The hat has pairs: the closed step plays the first, the open step the second.
 """
 import io
 import sys
@@ -31,54 +31,54 @@ V = "vogel:"   # rendered by tools/gen_vogel.py (ours, CC0), not fetched
 
 BANKS = {
     "KICK": (22050, 0.40, [
-        ("FMTHUD", V + "FMTHUD"),
-        ("RINGKIK", V + "RINGKIK"),
-        ("CRSHKIK", V + "CRSHKIK"),
-        ("COMBKIK", V + "COMBKIK"),
-        ("BDRUM", MB + "Bass Drum 1/BDrumNew_hit_v7_rr1_Sum.wav"),
-        ("FRAME-M", MB + "Frame Drum/HDrumL_HitMuted_v3_rr1_Sum.wav"),
-        ("TUMBA", MB + "Conga/Tumba_HitFM_v3_rr1_Sum.wav"),
-        ("LOG LO", ID + "Slit Drum/LogDrumLo_MedM_v3_rr1_Sum.wav"),
+        ("K909", V + "K909"),
+        ("RUMBLE", V + "RUMBLE"),
+        ("DEEPKK", V + "DEEPKK"),
+        ("DISTKIK", V + "DISTKIK"),
+        ("TAPEKIK", V + "TAPEKIK"),
+        ("BOXKIK", V + "BOXKIK"),
+        ("INDKIK", V + "INDKIK"),
+        ("GLTCHKK", V + "GLTCHKK"),
     ]),
     "SNARE": (32000, 0.32, [
-        ("RINGSN", V + "RINGSN"),
-        ("GRANSN", V + "GRANSN"),
-        ("CRSHSN", V + "CRSHSN"),
-        ("COMBSN", V + "COMBSN"),
-        ("GLTCHCL", V + "GLTCHCL"),
-        ("SNARE", MB + "Snare Drum, Modern 1/Snare2_HitSN_v9_rr1_Mid.wav"),
-        ("RIMSHOT", MB + "Snare Drum, Modern 3/Snare4_rimshot_v4_rr1_Mid.wav"),
-        ("CLAP", ID + "Claps/SoloClap_vl4.wav"),
+        ("CLAP9", V + "CLAP9"),
+        ("DRKCLAP", V + "DRKCLAP"),
+        ("SN909", V + "SN909"),
+        ("RIMSHT", V + "RIMSHT"),
+        ("METLSN", V + "METLSN"),
+        ("DISTSN", V + "DISTSN"),
+        ("GLTCHSN", V + "GLTCHSN"),
+        ("STATIC", V + "STATIC"),
     ]),
     "HAT": (32000, 0.15, 0.40, [
-        ("FMHAT", V + "FMHAT", V + "FMHAT"),
-        ("TICKHAT", V + "TICKHAT", V + "TICKHAT"),
-        ("COMBHAT", V + "COMBHAT", V + "COMBHAT"),
-        ("GRANHAT", V + "GRANHAT", V + "GRANHAT"),
-        ("RINGHAT", V + "RINGHAT", V + "RINGHAT"),
-        ("HIHAT", ID + "Hi-Hat Cymbal/HiHat_HitC_v4_rr1_Mid.wav", ID + "Hi-Hat Cymbal/HiHat_HitO_rr1_Mid.wav"),
-        ("SHAKER", ID + "Shaker, Small/Mid_ShakerDouble_Down_rr1.wav", ID + "Shaker, Small/Mid_Shaker_Roll_Fast_rr1.wav"),
-        ("TAMB", ID + "Tambourine 1/Tamb1_Hit_v2_rr1_Mid.wav", ID + "Tambourine 1/Tamb1_Shake_rr1_Mid.wav"),
+        ("HAT909", V + "HAT909", V + "HAT909"),
+        ("DRKHAT", V + "DRKHAT", V + "DRKHAT"),
+        ("TICK", V + "TICK", V + "TICK"),
+        ("SIZZLE", V + "SIZZLE", V + "SIZZLE"),
+        ("RIDE", V + "RIDE", V + "RIDE"),
+        ("GLTCHHT", V + "GLTCHHT", V + "GLTCHHT"),
+        ("BITHAT", V + "BITHAT", V + "BITHAT"),
+        ("CRSHCYM", V + "CRSHCYM", V + "CRSHCYM"),
     ]),
     "TIE": (32000, 0.30, [
-        ("FMPING", V + "FMPING"),
-        ("RINGPNG", V + "RINGPNG"),
-        ("KARPLUS", V + "KARPLUS"),
-        ("GRANBEL", V + "GRANBEL"),
-        ("CRSHPNG", V + "CRSHPNG"),
-        ("COWBELL", ID + "Cowbells/Cowbell1_Normal_v3_rr1_Mid.wav"),
-        ("WOOD", ID + "Woodblock/wood_click_f_rr1.wav"),
-        ("CONGA", MB + "Conga/Conga_HitN_v3_rr1_Sum.wav"),
+        ("STAB", V + "STAB"),
+        ("DUBSTB", V + "DUBSTB"),
+        ("ACIDPL", V + "ACIDPL"),
+        ("REESE", V + "REESE"),
+        ("FMBELL2", V + "FMBELL2"),
+        ("SUBTONE", V + "SUBTONE"),
+        ("METALT", V + "METALT"),
+        ("GLTCHTN", V + "GLTCHTN"),
     ]),
     "POD": (32000, 0.30, [
-        ("ZAPFM", V + "ZAPFM"),
-        ("COMBCLK", V + "COMBCLK"),
-        ("GLASS", V + "GLASS"),
-        ("GRANWOD", V + "GRANWOD"),
-        ("BITBLIP", V + "BITBLIP"),
-        ("CLAVES", ID + "Claves/Claves1_Hit_v2_rr1_Mid.wav"),
-        ("BRAKE", ID + "Brake Drum/BrakeDrum1_Hammer_v3_rr1_Mid.wav"),
-        ("TRIANGL", ID + "Triangles/Legacy/1/triangle1_hit_mp.wav"),
+        ("LASER", V + "LASER"),
+        ("GLTCH1", V + "GLTCH1"),
+        ("CLICK", V + "CLICK"),
+        ("BLEEP", V + "BLEEP"),
+        ("DATA", V + "DATA"),
+        ("COWDRK", V + "COWDRK"),
+        ("RATCHT", V + "RATCHT"),
+        ("SCRATCH", V + "SCRATCH"),
     ]),
 }
 
@@ -207,9 +207,10 @@ def main():
                     "Licence: CC0 1.0 Universal (public domain dedication)\n"
                     "  https://creativecommons.org/publicdomain/zero/1.0/\n"
                     "Sources:\n"
-                    "  - tools/gen_vogel.py: synthesised in this repository (FM, ring-mod, crush, comb, Karplus-Strong),\n"
-                    "    some from grains of VCSL recordings; dedicated to the public domain under CC0 1.0.\n"
-                    "  - Versilian Studios (Sam Gossner), VCSL  https://github.com/sgossner/VCSL  (CC0-1.0)\n"
+                    "  - tools/gen_vogel.py: synthesised in this repository (FM, ring-mod, crush, comb, Karplus-Strong,\n"
+                    "    drive, stutter); dedicated to the public domain under CC0 1.0.\n" +
+                    ("  - Versilian Studios (Sam Gossner), VCSL  https://github.com/sgossner/VCSL  (CC0-1.0)\n"
+                     if any("VCSL" in c for c in credits) else "") +
                     "Processed by tools/gen_samples.py: trimmed, normalised, faded, resampled, 8-bit mu-law.\n\n" +
                     "\n".join(credits) + "\n")
     print(f"{len(entries)} samples, {len(data)} bytes -> {OUT}")
